@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "settingdust.dustydatasync.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "refmap": "dusty_data_sync.refmap.json",
+  "mixins": [
+    "ftbquests.ServerQuestDataAccessor"
+  ],
+  "client": [
+  ]
+}

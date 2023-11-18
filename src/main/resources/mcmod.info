@@ -1,0 +1,18 @@
+[
+  {
+    "modid": "dusty_data_sync",
+    "name": "Dusty Data Sync",
+    "description": "",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": [
+      "SettingDust"
+    ],
+    "credits": "Authors of this project",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
