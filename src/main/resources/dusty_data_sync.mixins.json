@@ -5,7 +5,14 @@
   "compatibilityLevel": "JAVA_8",
   "refmap": "dusty_data_sync.refmap.json",
   "mixins": [
-    "ftbquests.ServerQuestDataAccessor"
+    "fluxnetwork.MixinFluxNetworkBase",
+    "fluxnetwork.MixinFluxNetworkCache",
+    "fluxnetwork.MixinFluxNetworkData",
+    "fluxnetwork.MixinFluxNetworkServer",
+    "ftbquests.MixinForgePlayer",
+    "ftbquests.MixinServerQuestData",
+    "ftbquests.ServerQuestDataAccessor",
+    "gamestages.MixinGameStageSaveHandler"
   ],
   "client": [
   ]

@@ -14,6 +14,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
     id("com.github.johnrengelman.shadow") version "6.1.0"
+    id("com.github.jmongard.git-semver-plugin") version "0.11.0"
 }
 
 apply(plugin = "net.minecraftforge.gradle")
@@ -29,7 +30,7 @@ kotlin {
 }
 
 group = "settingdust"
-version = "0.1.8"
+version = semver.semVersion
 
 configure<MinecraftExtension> {
     mappings("stable", "39-1.12")
@@ -102,7 +103,9 @@ dependencies {
     implementation(fg.deobf("curse.maven:game-stages-268655:2716924"))
     implementation(fg.deobf("curse.maven:item-stages-280316:2810185"))
     runtimeOnly(fg.deobf("curse.maven:bookshelf-228525:2717168"))
-    runtimeOnly(fg.deobf("CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.20.648"))
+    runtimeOnly("CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.20.648")
+
+    implementation(fg.deobf("curse.maven:flux-networks-248020:3178199"))
 
     shadow(implementation("org.jetbrains.exposed", "exposed-core", exposedVersion))
     shadow(implementation("org.jetbrains.exposed", "exposed-dao", exposedVersion))
@@ -110,6 +113,10 @@ dependencies {
     shadow(implementation("org.jetbrains.exposed", "exposed-json", exposedVersion))
 
     shadow(implementation("mysql", "mysql-connector-java", "8.0.33"))
+
+    shadow(implementation("com.zaxxer", "HikariCP", "4.0.3"))
+
+//    shadow(implementation("com.h2database", "h2", "2.2.224"))
 }
 
 

@@ -1,12 +1,12 @@
 package settingdust.dustydatasync
 
-import net.minecraftforge.fml.common.Loader
 import java.nio.file.Path
 import kotlin.io.path.createFile
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.div
 import kotlin.io.path.readLines
 import kotlin.io.path.writeLines
+import net.minecraftforge.fml.common.Loader
 
 object Locks {
     var players: MutableSet<String>
@@ -20,8 +20,7 @@ object Locks {
         try {
             configFile.createParentDirectories()
             configFile.createFile()
-        } catch (_: Throwable) {
-        }
+        } catch (_: Throwable) {}
         players = configFile.readLines().toMutableSet()
     }
 
