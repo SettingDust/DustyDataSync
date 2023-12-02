@@ -47,7 +47,7 @@ object DustyDataSync {
 
     val logger = LogManager.getLogger()
 
-    val scope = CoroutineScope(Dispatchers.Default)
+    val scope = CoroutineScope(Dispatchers.IO)
 
     lateinit var serverCoroutineScope: CoroutineScope
     lateinit var serverCoroutineDispatcher: CoroutineDispatcher
@@ -56,7 +56,8 @@ object DustyDataSync {
     fun preInit(event: FMLPreInitializationEvent) {
         MinecraftForge.EVENT_BUS.register(this)
         Locks
-        serverCoroutineDispatcher = MinecraftServerExecutor(FMLServerHandler.instance().server).asCoroutineDispatcher()
+        serverCoroutineDispatcher =
+            MinecraftServerExecutor(FMLServerHandler.instance().server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
     }
 
@@ -79,10 +80,12 @@ object DustyDataSync {
     fun onPlayerLogin(event: PlayerEvent.PlayerLoggedInEvent) {
         val player = event.player as EntityPlayerMP
         val uuid = player.uniqueID
-        serverCoroutineScope.launch {
-            if (!player.connection.networkManager.isChannelOpen) return@launch
-            Locks.players += uuid.toString()
-            Locks.save()
+        scope.launch {
+            launch(serverCoroutineDispatcher) {
+                if (!player.connection.networkManager.isChannelOpen) return@launch
+                Locks.players += uuid.toString()
+                Locks.save()
+            }
         }
     }
 
@@ -91,9 +94,11 @@ object DustyDataSync {
     fun onPlayerLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
         val player = event.player as EntityPlayerMP
         val uuid = player.uniqueID
-        serverCoroutineScope.launch {
-            Locks.players -= uuid.toString()
-            Locks.save()
+        scope.launch {
+            launch(serverCoroutineDispatcher) {
+                Locks.players -= uuid.toString()
+                Locks.save()
+            }
         }
     }
 
