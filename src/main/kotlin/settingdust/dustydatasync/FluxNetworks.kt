@@ -110,15 +110,15 @@ object FluxNetworksSyncer {
         val id = network.networkID
         val nbt = network.toNbt()
         val hashCode = nbt.hashCode()
-        if (FluxNetworksData[id].hash != hashCode)
-            transaction {
+        transaction {
+            if (FluxNetworksData[id].hash != hashCode)
                 logger.debug("编辑网络 ${network.networkID} ${network.networkName}")
-                FluxNetworksTable.upsert {
-                    it[FluxNetworksTable.id] = id
-                    it[data] = nbt
-                    it[hash] = hashCode
-                }
+            FluxNetworksTable.upsert {
+                it[FluxNetworksTable.id] = id
+                it[data] = nbt
+                it[hash] = hashCode
             }
+        }
     }
 
     private fun IFluxNetwork.toNbt() =

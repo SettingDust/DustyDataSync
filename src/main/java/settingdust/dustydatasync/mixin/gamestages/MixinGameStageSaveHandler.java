@@ -14,13 +14,7 @@ import settingdust.dustydatasync.GameStagesSyncer;
 
 @Mixin(value = GameStageSaveHandler.class, remap = false)
 public class MixinGameStageSaveHandler {
-    @Inject(
-            method = "onPlayerLoad",
-            at =
-                    @At(
-                            value = "INVOKE",
-                            target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
-                            shift = At.Shift.BEFORE))
+    @Inject(method = "onPlayerLoad", at = @At("TAIL"))
     private static void dustydatasync$loadData(
             PlayerEvent.LoadFromFile event, CallbackInfo ci, @Local IStageData data) {
         GameStagesSyncer.onLoadData(event, data);
