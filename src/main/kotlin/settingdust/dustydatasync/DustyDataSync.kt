@@ -2,8 +2,11 @@ package settingdust.dustydatasync
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
@@ -21,6 +24,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent
 import net.minecraftforge.fml.common.eventhandler.EventPriority
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.PlayerEvent
+import net.minecraftforge.fml.server.FMLServerHandler
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -31,11 +35,13 @@ import org.jetbrains.exposed.sql.statements.expandArgs
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import zone.rong.mixinbooter.ILateMixinLoader
+import java.util.concurrent.Executor
 
 @Mod(
     modid = DustyDataSync.MODID,
     acceptableRemoteVersions = "*",
-    modLanguageAdapter = "net.shadowfacts.forgelin.KotlinAdapter"
+    modLanguageAdapter = "net.shadowfacts.forgelin.KotlinAdapter",
+    serverSideOnly = true
 )
 object DustyDataSync {
     const val MODID = "dusty_data_sync"
@@ -44,10 +50,16 @@ object DustyDataSync {
 
     val scope = CoroutineScope(Dispatchers.Default)
 
+    lateinit var serverCoroutineScope: CoroutineScope
+    lateinit var serverCoroutineDispatcher: CoroutineDispatcher
+
     @Mod.EventHandler
     fun preInit(event: FMLPreInitializationEvent) {
         MinecraftForge.EVENT_BUS.register(this)
         Locks
+        serverCoroutineDispatcher =
+            (FMLServerHandler.instance().server as Executor).asCoroutineDispatcher()
+        serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
     }
 
     @Mod.EventHandler
@@ -69,12 +81,10 @@ object DustyDataSync {
     fun onPlayerLogin(event: PlayerEvent.PlayerLoggedInEvent) {
         val player = event.player as EntityPlayerMP
         val uuid = player.uniqueID
-        scope.launch {
-            player.server.addScheduledTask {
-                if (!player.connection.networkManager.isChannelOpen) return@addScheduledTask
-                Locks.players += uuid.toString()
-                Locks.save()
-            }
+        serverCoroutineScope.launch {
+            if (!player.connection.networkManager.isChannelOpen) return@launch
+            Locks.players += uuid.toString()
+            Locks.save()
         }
     }
 
@@ -83,11 +93,9 @@ object DustyDataSync {
     fun onPlayerLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
         val player = event.player as EntityPlayerMP
         val uuid = player.uniqueID
-        scope.launch {
-            player.server.addScheduledTask {
-                Locks.players -= uuid.toString()
-                Locks.save()
-            }
+        serverCoroutineScope.launch {
+            Locks.players -= uuid.toString()
+            Locks.save()
         }
     }
 

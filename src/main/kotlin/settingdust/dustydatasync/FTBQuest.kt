@@ -104,15 +104,13 @@ object FTBQuestSyncer {
     @SubscribeEvent
     fun onPlayerLogin(event: PlayerEvent.PlayerLoggedInEvent) {
         val player = event.player as EntityPlayerMP
-        DustyDataSync.scope.launch {
-            player.server.addScheduledTask {
-                if (player.connection.networkManager.isChannelOpen) {
-                    val uuid = player.uniqueID
-                    // 等待其他数据判断完毕，没有踢出之后再锁定玩家
-                    logger.debug("锁定玩家 ${player.name}")
-                    transaction {
-                        FTBQuestTable.update({ FTBQuestTable.id eq uuid }) { it[lock] = true }
-                    }
+        DustyDataSync.serverCoroutineScope.launch {
+            if (player.connection.networkManager.isChannelOpen) {
+                val uuid = player.uniqueID
+                // 等待其他数据判断完毕，没有踢出之后再锁定玩家
+                logger.debug("锁定玩家 ${player.name}")
+                transaction {
+                    FTBQuestTable.update({ FTBQuestTable.id eq uuid }) { it[lock] = true }
                 }
             }
         }

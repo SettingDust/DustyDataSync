@@ -94,22 +94,20 @@ object GameStagesSyncer {
     @SubscribeEvent
     fun onPlayerLogin(event: PlayerLoggedInEvent) {
         val player = event.player as EntityPlayerMP
-        DustyDataSync.scope.launch {
-            player.server.addScheduledTask {
-                if (player.connection.networkManager.isChannelOpen) {
-                    val uuid = player.uniqueID
-                    // 等待其他数据判断完毕，没有踢出之后再锁定玩家
-                    logger.debug("锁定玩家 ${player.name}")
-                    transaction {
-                        GameStagesTable.update({ GameStagesTable.id eq uuid }) { it[lock] = true }
-                    }
-
-                    if (player !in waitForKick) return@addScheduledTask
-                    player.connection.disconnect(
-                        TextComponentString(DustyDataSync.Messages.kickLockMessage)
-                    )
-                    waitForKick.remove(player)
+        DustyDataSync.serverCoroutineScope.launch {
+            if (player.connection.networkManager.isChannelOpen) {
+                val uuid = player.uniqueID
+                // 等待其他数据判断完毕，没有踢出之后再锁定玩家
+                logger.debug("锁定玩家 ${player.name}")
+                transaction {
+                    GameStagesTable.update({ GameStagesTable.id eq uuid }) { it[lock] = true }
                 }
+
+                if (player !in waitForKick) return@launch
+                player.connection.disconnect(
+                    TextComponentString(DustyDataSync.Messages.kickLockMessage)
+                )
+                waitForKick.remove(player)
             }
         }
     }
