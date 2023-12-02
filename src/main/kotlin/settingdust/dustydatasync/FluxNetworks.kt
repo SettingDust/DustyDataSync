@@ -23,6 +23,8 @@ object FluxNetworksTable : IdTable<Int>() {
     val hash = integer("hash").default(0)
 
     val data = json<NBTTagCompound>("data", json, NBTTagCompoundSerializer)
+
+    override val primaryKey = PrimaryKey(id)
 }
 
 class FluxNetworksData(id: EntityID<Int>) : IntEntity(id) {
