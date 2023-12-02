@@ -37,7 +37,6 @@ object FluxNetworksSyncer {
 
     @JvmStatic
     fun onLoadData() {
-        logger.debug("加载全部网络")
         val fluxNetworkData = FluxNetworkData.get()
 
         // 移除不在数据库里的网络

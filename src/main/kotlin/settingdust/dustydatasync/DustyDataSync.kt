@@ -113,6 +113,8 @@ object DustyDataSync {
 
         @JvmField @Comment("每次重试恢复数据会等待的的延迟时间，重试次数为 5，单位是毫秒") @RangeInt(min = 0) var syncDelay = 50
 
+        @JvmField @Comment("显示 SQL 日志") @RangeInt(min = 0) var debug = false
+
         fun reload() {
             database =
                 org.jetbrains.exposed.sql.Database.connect(
@@ -124,7 +126,9 @@ object DustyDataSync {
                             validate()
                         }
                     ),
-                    databaseConfig = DatabaseConfig { sqlLogger = Log4jSqlLogger }
+                    databaseConfig = DatabaseConfig {
+                        if (debug) sqlLogger = Log4jSqlLogger
+                    }
                 )
             TransactionManager.defaultDatabase = database
             transaction {
@@ -148,6 +152,7 @@ object DustyDataSync {
         @JvmField var kickLockMessage = "当前玩家在数据库中被锁定"
     }
 
+    @Suppress("unused")
     class MixinLoader : ILateMixinLoader {
         override fun getMixinConfigs() = listOf("dusty_data_sync.mixins.json")
     }
