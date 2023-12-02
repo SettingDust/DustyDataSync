@@ -83,6 +83,7 @@ object DustyDataSync {
         scope.launch {
             launch(serverCoroutineDispatcher) {
                 if (!player.connection.networkManager.isChannelOpen) return@launch
+                logger.debug("本地锁定玩家 ${player.name}")
                 Locks.players += uuid.toString()
                 Locks.save()
             }
@@ -96,6 +97,7 @@ object DustyDataSync {
         val uuid = player.uniqueID
         scope.launch {
             launch(serverCoroutineDispatcher) {
+                logger.debug("本地解锁玩家 ${player.name}")
                 Locks.players -= uuid.toString()
                 Locks.save()
             }
