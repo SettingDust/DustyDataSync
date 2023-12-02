@@ -35,7 +35,6 @@ import org.jetbrains.exposed.sql.statements.expandArgs
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import zone.rong.mixinbooter.ILateMixinLoader
-import java.util.concurrent.Executor
 
 @Mod(
     modid = DustyDataSync.MODID,
@@ -57,8 +56,7 @@ object DustyDataSync {
     fun preInit(event: FMLPreInitializationEvent) {
         MinecraftForge.EVENT_BUS.register(this)
         Locks
-        serverCoroutineDispatcher =
-            (FMLServerHandler.instance().server as Executor).asCoroutineDispatcher()
+        serverCoroutineDispatcher = MinecraftServerExecutor(FMLServerHandler.instance().server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
     }
 
@@ -126,9 +124,7 @@ object DustyDataSync {
                             validate()
                         }
                     ),
-                    databaseConfig = DatabaseConfig {
-                        if (debug) sqlLogger = Log4jSqlLogger
-                    }
+                    databaseConfig = DatabaseConfig { if (debug) sqlLogger = Log4jSqlLogger }
                 )
             TransactionManager.defaultDatabase = database
             transaction {

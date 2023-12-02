@@ -5,7 +5,6 @@
   "compatibilityLevel": "JAVA_8",
   "refmap": "dusty_data_sync.refmap.json",
   "mixins": [
-    "MixinMinecraftServer",
     "fluxnetwork.MixinFluxNetworkBase",
     "fluxnetwork.MixinFluxNetworkCache",
     "fluxnetwork.MixinFluxNetworkData",
