@@ -90,6 +90,10 @@ dependencies {
 
     implementation("zone.rong:mixinbooter:8.9")
 
+    implementation(kotlin("stdlib-jdk8"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+
     annotationProcessor("org.spongepowered:mixin:0.8.5:processor") { isTransitive = false }
     annotationProcessor("io.github.llamalad7:mixinextras-common:0.2.1-beta.2") { isTransitive = false }
 

@@ -2,12 +2,14 @@ package settingdust.dustydatasync
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import net.darkhax.gamestages.data.IStageData
 import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.util.text.TextComponentString
 import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.fml.common.Mod
+import net.minecraftforge.fml.common.eventhandler.EventPriority
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent
 import net.minecraftforge.fml.relauncher.Side
@@ -30,14 +32,15 @@ class GameStagesData(id: EntityID<UUID>) : PlayerNbtEntity(id, GameStagesTable) 
 @Mod.EventBusSubscriber(value = [Side.SERVER], modid = DustyDataSync.MODID)
 object GameStagesSyncer {
     @JvmStatic private val logger = LogManager.getLogger()
-
-    @JvmStatic private val waitForKick = mutableSetOf<EntityPlayerMP>()
+    @JvmStatic private val mutexs = mutableMapOf<UUID, Mutex>()
 
     @JvmStatic
     fun onLoadData(event: PlayerEvent.LoadFromFile, stageData: IStageData) =
         DustyDataSync.scope.launch {
             val player = event.entityPlayer as EntityPlayerMP
             val uuid = player.uniqueID
+            val mutex = mutexs.getOrPut(uuid) { Mutex() }
+            mutex.lock()
             var retryCounter = 0
             newSuspendedTransaction {
                 GameStagesTable.insertIgnore {
@@ -46,7 +49,7 @@ object GameStagesSyncer {
                 }
             }
             val uuidString = uuid.toString()
-            val localLocked = uuidString in Locks.players
+            val localLocked = uuidString in PlayerLocalLocker.players
             var databaseLocked = newSuspendedTransaction {
                 GameStagesTable.slice(GameStagesTable.lock)
                     .select { GameStagesTable.id eq uuid }
@@ -66,47 +69,58 @@ object GameStagesSyncer {
                     continue
                 }
                 logger.debug("玩家 ${player.name} 数据被锁定且未在本服务器锁定，不允许进入")
-                waitForKick += player
+                PlayerKicker.needKick += uuid
                 return@launch
             }
 
-            val playerData = newSuspendedTransaction { GameStagesData[uuid] }
-
-            if (playerData.lock && localLocked) {
+            if (databaseLocked) {
                 logger.warn("玩家 ${player.name} 在本服务器被锁定，可能是退出时没有正常保存，需要用本地数据覆盖数据库数据")
-                newSuspendedTransaction { playerData.data = stageData.writeToNBT() }
+                newSuspendedTransaction {
+                    GameStagesTable.update({ GameStagesTable.id eq uuid }) {
+                        it[GameStagesTable.data] = stageData.writeToNBT()
+                    }
+                }
             } else {
                 logger.debug("玩家 ${player.name} 未锁定，加载数据")
                 newSuspendedTransaction {
                     logger.debug("恢复 ${player.name} 数据")
-                    val tag = playerData.data
+                    val tag =
+                        GameStagesTable.slice(GameStagesTable.data)
+                            .select { GameStagesTable.id eq uuid }
+                            .single()[GameStagesTable.data]
                     if (tag.isEmpty) {
                         logger.debug("玩家 ${player.name} 数据为空，存储数据")
-                        newSuspendedTransaction { playerData.data = stageData.writeToNBT() }
+                        GameStagesTable.update({ GameStagesTable.id eq uuid }) {
+                            it[GameStagesTable.data] = stageData.writeToNBT()
+                        }
                     } else {
                         stageData.clear()
-                        stageData.readFromNBT(playerData.data)
+                        stageData.readFromNBT(tag)
                     }
                 }
             }
+            mutex.unlock()
         }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     fun onPlayerLogin(event: PlayerLoggedInEvent) {
         val player = event.player as EntityPlayerMP
-        if (player.connection.networkManager.isChannelOpen) {
-            val uuid = player.uniqueID
-            // 等待其他数据判断完毕，没有踢出之后再锁定玩家
-            logger.debug("锁定玩家 ${player.name}")
-            transaction {
-                GameStagesTable.update({ GameStagesTable.id eq uuid }) { it[lock] = true }
-            }
+        val uuid = player.uniqueID
+        DustyDataSync.scope.launch {
+            mutexs
+                .getOrPut(uuid) { Mutex() }
+                .withLock {
+                    if (player.connection.networkManager.isChannelOpen) {
 
-            if (player !in waitForKick) return
-            player.connection.disconnect(
-                TextComponentString(DustyDataSync.Messages.kickLockMessage)
-            )
-            waitForKick.remove(player)
+                        // 等待其他数据判断完毕，没有踢出之后再锁定玩家
+                        logger.debug("锁定玩家 ${player.name}")
+                        transaction {
+                            GameStagesTable.update({ GameStagesTable.id eq uuid }) {
+                                it[lock] = true
+                            }
+                        }
+                    }
+                }
         }
     }
 
@@ -115,7 +129,7 @@ object GameStagesSyncer {
         val player = event.entityPlayer
         val uuid = player.uniqueID
         // 玩家不是在本地被锁定的，不能存数据进去
-        if (uuid.toString() !in Locks.players) return
+        if (uuid.toString() !in PlayerLocalLocker.players) return
         transaction {
             logger.debug("保存玩家 ${player.name} 数据到文件，存储数据")
             GameStagesTable.update({ GameStagesTable.id eq uuid }) {

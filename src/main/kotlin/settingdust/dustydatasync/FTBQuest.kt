@@ -5,6 +5,8 @@ import com.feed_the_beast.ftblib.lib.data.Universe
 import com.feed_the_beast.ftbquests.util.ServerQuestData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraftforge.fml.common.Mod
@@ -32,12 +34,15 @@ class FTBQuestData(id: EntityID<UUID>) : PlayerNbtEntity(id, FTBQuestTable) {
 @Mod.EventBusSubscriber(value = [Side.SERVER], modid = DustyDataSync.MODID)
 object FTBQuestSyncer {
     private val logger = LogManager.getLogger()
+    @JvmStatic private val mutexs = mutableMapOf<UUID, Mutex>()
 
     @JvmStatic
     fun onLoadData(event: ForgePlayerLoggedInEvent, questData: ServerQuestData) =
         DustyDataSync.scope.launch {
             val forgePlayer = event.team.owner
             val uuid = forgePlayer.profile.id
+            val mutex = mutexs.getOrPut(uuid) { Mutex() }
+            mutex.lock()
             var retryCounter = 0
             newSuspendedTransaction {
                 FTBQuestTable.insertIgnore {
@@ -47,7 +52,7 @@ object FTBQuestSyncer {
             }
 
             val uuidString = uuid.toString()
-            val localLocked = uuidString in Locks.players
+            val localLocked = uuidString in PlayerLocalLocker.players
             var databaseLocked = newSuspendedTransaction {
                 FTBQuestTable.slice(FTBQuestTable.lock)
                     .select { FTBQuestTable.id eq uuid }
@@ -66,49 +71,63 @@ object FTBQuestSyncer {
                     }
                     continue
                 }
+                PlayerKicker.needKick += uuid
                 logger.debug("玩家 ${forgePlayer.name} 数据被锁定且未在本服务器锁定，不允许进入")
                 return@launch
             }
 
-            val playerData = newSuspendedTransaction { FTBQuestData[uuid] }
-
-            if (playerData.lock && localLocked) {
+            if (databaseLocked) {
                 logger.warn("玩家 ${forgePlayer.name} 在本服务器被锁定，可能是退出时没有正常保存，需要用本地数据覆盖数据库数据")
                 newSuspendedTransaction {
-                    playerData.data =
-                        NBTTagCompound().also {
-                            (questData as ServerQuestDataAccessor).`dustydatasync$writeData`(it)
-                        }
+                    FTBQuestTable.update({ FTBQuestTable.id eq uuid }) {
+                        it[FTBQuestTable.data] =
+                            NBTTagCompound().also {
+                                (questData as ServerQuestDataAccessor).`dustydatasync$writeData`(it)
+                            }
+                    }
                 }
             } else {
                 logger.debug("玩家 ${forgePlayer.name} 未锁定，加载数据")
                 newSuspendedTransaction {
                     logger.debug("恢复 ${forgePlayer.name} 数据")
-                    val tag = playerData.data
+                    val tag =
+                        FTBQuestTable.slice(FTBQuestTable.data)
+                            .select { FTBQuestTable.id eq uuid }
+                            .single()[FTBQuestTable.data]
                     if (tag.isEmpty) {
                         logger.debug("玩家 ${forgePlayer.name} 数据为空，存储数据")
-                        playerData.data =
-                            NBTTagCompound().also {
-                                (questData as ServerQuestDataAccessor).`dustydatasync$writeData`(it)
-                            }
+                        FTBQuestTable.update({ FTBQuestTable.id eq uuid }) {
+                            it[FTBQuestTable.data] =
+                                NBTTagCompound().also {
+                                    (questData as ServerQuestDataAccessor)
+                                        .`dustydatasync$writeData`(it)
+                                }
+                        }
                     } else {
                         questData.markDirty()
-                        (questData as ServerQuestDataAccessor).`dustydatasync$readData`(
-                            playerData.data
-                        )
+                        (questData as ServerQuestDataAccessor).`dustydatasync$readData`(tag)
                     }
                 }
             }
+            mutex.unlock()
         }
 
     @SubscribeEvent
     fun onPlayerLogin(event: PlayerEvent.PlayerLoggedInEvent) {
         val player = event.player as EntityPlayerMP
-        if (player.connection.networkManager.isChannelOpen) {
-            val uuid = player.uniqueID
-            // 等待其他数据判断完毕，没有踢出之后再锁定玩家
-            logger.debug("锁定玩家 ${player.name}")
-            transaction { FTBQuestTable.update({ FTBQuestTable.id eq uuid }) { it[lock] = true } }
+        val uuid = player.uniqueID
+        DustyDataSync.scope.launch {
+            mutexs
+                .getOrPut(uuid) { Mutex() }
+                .withLock {
+                    if (player.connection.networkManager.isChannelOpen) {
+                        // 等待其他数据判断完毕，没有踢出之后再锁定玩家
+                        logger.debug("锁定玩家 ${player.name}")
+                        transaction {
+                            FTBQuestTable.update({ FTBQuestTable.id eq uuid }) { it[lock] = true }
+                        }
+                    }
+                }
         }
     }
 
@@ -117,7 +136,7 @@ object FTBQuestSyncer {
         val player = event.player
         val uuid = player.uniqueID
         // 玩家不是在本地被锁定的，不能存数据进去
-        if (uuid.toString() !in Locks.players) return
+        if (uuid.toString() !in PlayerLocalLocker.players) return
         transaction {
             logger.debug("玩家 ${player.name} 退出，存储数据")
 

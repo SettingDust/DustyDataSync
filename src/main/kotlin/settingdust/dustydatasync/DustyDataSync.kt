@@ -7,11 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
-import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraftforge.common.MinecraftForge
 import net.minecraftforge.common.config.Config
 import net.minecraftforge.common.config.Config.Comment
@@ -21,9 +19,7 @@ import net.minecraftforge.fml.client.event.ConfigChangedEvent.OnConfigChangedEve
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.event.FMLInitializationEvent
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent
-import net.minecraftforge.fml.common.eventhandler.EventPriority
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
-import net.minecraftforge.fml.common.gameevent.PlayerEvent
 import net.minecraftforge.fml.server.FMLServerHandler
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.exposed.sql.DatabaseConfig
@@ -55,7 +51,7 @@ object DustyDataSync {
     @Mod.EventHandler
     fun preInit(event: FMLPreInitializationEvent) {
         MinecraftForge.EVENT_BUS.register(this)
-        Locks
+        PlayerLocalLocker
         serverCoroutineDispatcher =
             MinecraftServerExecutor(FMLServerHandler.instance().server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
@@ -72,35 +68,6 @@ object DustyDataSync {
         if (event.modID == MODID) {
             ConfigManager.sync(MODID, Config.Type.INSTANCE)
             Database.reload()
-        }
-    }
-
-    // 最后本地锁定玩家
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    fun onPlayerLogin(event: PlayerEvent.PlayerLoggedInEvent) {
-        val player = event.player as EntityPlayerMP
-        val uuid = player.uniqueID
-        scope.launch {
-            launch(serverCoroutineDispatcher) {
-                if (!player.connection.networkManager.isChannelOpen) return@launch
-                logger.debug("本地锁定玩家 ${player.name}")
-                Locks.players += uuid.toString()
-                Locks.save()
-            }
-        }
-    }
-
-    // 在所有东西都保存后本地解锁玩家
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    fun onPlayerLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
-        val player = event.player as EntityPlayerMP
-        val uuid = player.uniqueID
-        scope.launch {
-            launch(serverCoroutineDispatcher) {
-                logger.debug("本地解锁玩家 ${player.name}")
-                Locks.players -= uuid.toString()
-                Locks.save()
-            }
         }
     }
 
