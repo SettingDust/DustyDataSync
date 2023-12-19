@@ -36,10 +36,10 @@ object FTBQuestSyncer {
     private val logger = LogManager.getLogger()
     @JvmStatic private val mutexs = mutableMapOf<UUID, Mutex>()
 
-    @JvmStatic
-    fun onLoadData(event: ForgePlayerLoggedInEvent, questData: ServerQuestData) =
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    fun onLoadData(event: PlayerEvent.PlayerLoggedInEvent) =
         DustyDataSync.scope.launch {
-            val forgePlayer = event.team.owner
+            val forgePlayer = Universe.get().getPlayer(event.player)
             val uuid = forgePlayer.profile.id
             val mutex = mutexs.getOrPut(uuid) { Mutex() }
             mutex.lock()
@@ -76,6 +76,8 @@ object FTBQuestSyncer {
                 return@launch
             }
 
+            val questData = ServerQuestData.get(forgePlayer.team)
+
             if (databaseLocked) {
                 logger.warn("玩家 ${forgePlayer.name} 在本服务器被锁定，可能是退出时没有正常保存，需要用本地数据覆盖数据库数据")
                 newSuspendedTransaction {
@@ -104,10 +106,13 @@ object FTBQuestSyncer {
                                 }
                         }
                     } else {
-                        questData.markDirty()
                         logger.debug("数据：{}", tag)
                         (questData as ServerQuestDataAccessor).`dustydatasync$readData`(tag)
-                        ServerQuestData.onPlayerLoggedIn(event)
+                        questData.markDirty()
+                        // 非主线程访问会导致 https://github.com/vigna/fastutil/issues/42
+                        DustyDataSync.serverCoroutineScope.launch {
+                            ServerQuestData.onPlayerLoggedIn(ForgePlayerLoggedInEvent(forgePlayer))
+                        }
                     }
                 }
             }

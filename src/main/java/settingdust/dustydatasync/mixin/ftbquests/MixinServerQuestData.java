@@ -17,18 +17,4 @@ public class MixinServerQuestData {
             ci.cancel();
         }
     }
-
-    @Inject(
-            method = "onPlayerLoggedIn",
-            at =
-                    @At(
-                            value = "INVOKE",
-                            shift = At.Shift.AFTER,
-                            target =
-                                    "Lcom/feed_the_beast/ftblib/lib/data/ForgePlayer;getPlayer()Lnet/minecraft/entity/player/EntityPlayerMP;",
-                            ordinal = 0))
-    private static void dustydatasync$loadData(
-            ForgePlayerLoggedInEvent event, CallbackInfo ci, @Local ServerQuestData data) {
-        FTBQuestSyncer.onLoadData(event, data);
-    }
 }
