@@ -95,6 +95,7 @@ object GameStagesSyncer {
                         }
                     } else {
                         stageData.clear()
+                        logger.debug("数据：{}", tag)
                         stageData.readFromNBT(tag)
                     }
                 }

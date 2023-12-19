@@ -98,14 +98,16 @@ object FTBQuestSyncer {
                         logger.debug("玩家 ${forgePlayer.name} 数据为空，存储数据")
                         FTBQuestTable.update({ FTBQuestTable.id eq uuid }) {
                             it[FTBQuestTable.data] =
-                                NBTTagCompound().also {
+                                NBTTagCompound().also { tag ->
                                     (questData as ServerQuestDataAccessor)
-                                        .`dustydatasync$writeData`(it)
+                                        .`dustydatasync$writeData`(tag)
                                 }
                         }
                     } else {
                         questData.markDirty()
+                        logger.debug("数据：{}", tag)
                         (questData as ServerQuestDataAccessor).`dustydatasync$readData`(tag)
+                        ServerQuestData.onPlayerLoggedIn(event)
                     }
                 }
             }
