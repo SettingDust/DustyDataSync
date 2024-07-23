@@ -1,128 +1,91 @@
-import net.minecraftforge.gradle.common.util.MinecraftExtension
-import net.minecraftforge.gradle.userdev.DependencyManagementExtension
-
-buildscript {
-    dependencies {
-        classpath(group = "net.minecraftforge.gradle", name = "ForgeGradle", version = "4.+")
-        classpath("org.spongepowered:mixingradle:0.7-SNAPSHOT")
-    }
-}
+import groovy.lang.Closure
 
 plugins {
-    java
     idea
-    kotlin("jvm")
-    kotlin("plugin.serialization")
-    id("com.github.johnrengelman.shadow") version "6.1.0"
-    id("com.github.jmongard.git-semver-plugin") version "0.11.0"
+    java
+    `maven-publish`
+    alias(catalog.plugins.idea.ext)
+
+    alias(catalog.plugins.kotlin.jvm)
+    alias(catalog.plugins.kotlin.plugin.serialization)
+
+    alias(catalog.plugins.git.version)
+
+    alias(catalog.plugins.retro.gradle)
+
+    alias(catalog.plugins.shadow)
 }
 
-apply(plugin = "net.minecraftforge.gradle")
-apply(plugin = "org.spongepowered.mixin")
+apply(
+    "https://github.com/SettingDust/MinecraftGradleScripts/raw/main/gradle_issue_15754.gradle.kts")
+
+group = "settingdust"
+
+val gitVersion: Closure<String> by extra
+
+version = gitVersion()
+
+val id: String by rootProject.properties
+val name: String by rootProject.properties
+val author: String by rootProject.properties
+val description: String by rootProject.properties
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(8))
     withSourcesJar()
 }
 
-kotlin {
-    jvmToolchain(8)
-}
+kotlin { jvmToolchain(8) }
 
-group = "settingdust"
-version = semver.semVersion
+base { archivesName = id }
 
-configure<MinecraftExtension> {
-    mappings("stable", "39-1.12")
+minecraft {
+    mcVersion = catalog.versions.minecraft
 
-    runs {
-        create("client") {
-            workingDirectory(project.file("run"))
+    mcpMappingChannel = "stable"
+    mcpMappingVersion = "39"
 
-            property("forge.logging.markers", "SCAN,LOADING,CORE")
-            property("forge.logging.console.level", "debug")
+    useDependencyAccessTransformers = true
 
-            jvmArgs(
-                "-Dmixin.hotSwap=true",
-                "-Dmixin.checks.interfaces=true",
-                "-Dmixin.debug.export=true",
-                "-Dmixin.debug.verbose=true"
-            )
-        }
+    username = "Developer"
 
-        create("server") {
-            workingDirectory(project.file("run/server"))
+    extraRunJvmArguments.addAll(
+        "-Dmixin.hotSwap=true", "-Dmixin.checks.interfaces=true", "-Dmixin.debug.export=true")
 
-            property("forge.logging.markers", "SCAN,LOADING,CORE")
-            property("forge.logging.console.level", "debug")
-        }
-    }
+    injectedTags.set(mapOf("VERSION" to project.version, "ID" to id, "NAME" to name))
 }
 
 repositories {
-    maven("https://cursemaven.com") {
-        content {
-            includeGroup("curse.maven")
-        }
-    }
-    maven("https://maven.cleanroommc.com") {
-        content {
-            includeGroup("zone.rong")
-        }
-    }
-    maven("https://maven.blamejared.com/") {
-        content {
-            includeGroup("CraftTweaker2")
-        }
-    }
-    maven("https://repo.spongepowered.org/repository/maven-public/")
-    mavenCentral()
-    mavenLocal()
+    maven("https://cursemaven.com") { content { includeGroup("curse.maven") } }
+    maven("https://maven.blamejared.com/") { content { includeGroup("CraftTweaker2") } }
 }
-
-val mcVersion: String by project
-val forgeVersion: String by project
-
-val exposedVersion: String by project
 
 dependencies {
-    "minecraft"("net.minecraftforge:forge:$mcVersion-$forgeVersion")
+    val mixin = modUtils.enableMixins(catalog.mixinbooter.get().toString(), "$id.refmap.json")
 
-    implementation("zone.rong:mixinbooter:8.9")
+    implementation(mixin)
+    shadow(catalog.mixinextras.common) { isTransitive = false }
+    annotationProcessor(catalog.mixinextras.common) { isTransitive = false }
 
-    implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    implementation(catalog.bundles.exposed)
+    shadow(catalog.bundles.exposed)
 
-    annotationProcessor("org.spongepowered:mixin:0.8.5:processor") { isTransitive = false }
-    annotationProcessor("io.github.llamalad7:mixinextras-common:0.2.1-beta.2") { isTransitive = false }
+    implementation(catalog.kotlinx.coroutines)
+    implementation(catalog.kotlinx.serialization.json)
 
-    val fg = project.extensions.getByName<DependencyManagementExtension>("fg")
-    implementation(fg.deobf("net.shadowfacts:Forgelin:1.9.0"))
+    implementation(catalog.kotlin.forge)
 
-    implementation(fg.deobf("curse.maven:ftb-quests-forge-289412:3015063"))
-    implementation(fg.deobf("curse.maven:ftb-library-legacy-forge-237167:2985811"))
-    runtimeOnly(fg.deobf("curse.maven:item-filters-309674:3003364"))
+    implementation(catalog.ftb.quests)
+    implementation(catalog.ftb.library)
+    runtimeOnly(catalog.item.filters)
 
-    implementation(fg.deobf("curse.maven:game-stages-268655:2716924"))
-    implementation(fg.deobf("curse.maven:item-stages-280316:2810185"))
-    runtimeOnly(fg.deobf("curse.maven:bookshelf-228525:2717168"))
-    runtimeOnly("CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.20.648")
+    implementation(catalog.game.stages)
+    implementation(catalog.item.stages)
+    runtimeOnly(catalog.bookshelf)
+    runtimeOnly(catalog.crafttweaker)
 
-    implementation(fg.deobf("curse.maven:flux-networks-248020:3178199"))
-
-    shadow(implementation("org.jetbrains.exposed", "exposed-core", exposedVersion))
-    shadow(implementation("org.jetbrains.exposed", "exposed-dao", exposedVersion))
-    shadow(implementation("org.jetbrains.exposed", "exposed-jdbc", exposedVersion))
-    shadow(implementation("org.jetbrains.exposed", "exposed-json", exposedVersion))
-
-    shadow(implementation("mysql", "mysql-connector-java", "8.0.33"))
-
-    shadow(implementation("com.zaxxer", "HikariCP", "4.0.3"))
-
-//    shadow(implementation("com.h2database", "h2", "2.2.224"))
+    implementation(catalog.flux.networks)
 }
-
 
 tasks {
     shadowJar {
@@ -135,16 +98,14 @@ tasks {
             exclude(dependency("org.intellij.lang:annotations"))
             exclude(dependency("org.jetbrains.kotlin::"))
             exclude(dependency("org.jetbrains.kotlinx::"))
+
+            relocate("com.llamalad7.mixinextras", "settingdust.mixinextras")
         }
 
         finalizedBy("reobfJar")
     }
 
-    build {
-        dependsOn(shadowJar)
-    }
+    build { dependsOn(shadowJar) }
 
-    artifacts {
-        archives(shadowJar)
-    }
+    artifacts { archives(shadowJar) }
 }

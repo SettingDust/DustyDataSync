@@ -1,17 +1,45 @@
-pluginManagement {
-    // when using additional gradle plugins like shadow,
-    // add their repositories to this list!
-    repositories {
-        maven("https://repo.spongepowered.org/repository/maven-public/")
-        maven("https://maven.minecraftforge.net/")
-        gradlePluginPortal()
+extra["minecraft"] = "1.12.2"
+
+apply("https://github.com/SettingDust/MinecraftGradleScripts/raw/main/common.gradle.kts")
+
+apply("https://github.com/SettingDust/MinecraftGradleScripts/raw/main/kotlin.gradle.kts")
+
+apply("https://github.com/SettingDust/MinecraftGradleScripts/raw/main/forge.gradle.kts")
+
+apply("https://github.com/SettingDust/MinecraftGradleScripts/raw/main/mixin.gradle.kts")
+
+dependencyResolutionManagement.versionCatalogs.named("catalog") {
+    val exposed = "0.52.0"
+    library("exposed-core", "org.jetbrains.exposed", "exposed-core").version(exposed)
+    library("exposed-exposed-dao", "org.jetbrains.exposed", "exposed-dao").version(exposed)
+    library("exposed-jdbc", "org.jetbrains.exposed", "exposed-jdbc").version(exposed)
+    library("exposed-json", "org.jetbrains.exposed", "exposed-json").version(exposed)
+
+    bundle("exposed", listOf("exposed-core", "exposed-exposed-dao", "exposed-jdbc", "exposed-json"))
+
+    library("mysql", "mysql", "mysql-connector-java").version("8.0.33")
+    library("hikaricp", "com.zaxxer", "HikariCP").version("5.1.0")
+
+    fun curseMaven(alias: String, slug: String, id: Int, version: Int) {
+        library(alias, "curse.maven", "$slug-$id").version(version.toString())
     }
 
-    plugins {
-        id("org.gradle.toolchains.foojay-resolver-convention") version("0.5.0")
-        kotlin("jvm") version "1.9.10"
-        kotlin("plugin.serialization") version "1.9.10"
-    }
+    fun curseMaven(slug: String, id: Int, version: Int) = curseMaven(slug, slug, id, version)
+
+    curseMaven("ftb-quests", "ftb-quests-forge", 289412, 3015063)
+    curseMaven("ftb-library", "ftb-library-legacy-forge", 237167, 2985811)
+    curseMaven("item-filters", 309674, 3003364)
+
+    curseMaven("game-stages", 268655, 2716924)
+    curseMaven("item-stages", 280316, 2810185)
+    curseMaven("bookshelf", 228525, 2717168)
+    library("crafttweaker", "CraftTweaker2", "CraftTweaker2-MC1120-Main").version("1.12-4.1.20.648")
+
+    curseMaven("flux-networks", 248020, 3178199)
 }
 
-rootProject.name = "DustyDataSync"
+plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0" }
+
+val name: String by settings
+
+rootProject.name = name
