@@ -15,10 +15,10 @@ dependencyResolutionManagement.versionCatalogs.named("catalog") {
     library("exposed-jdbc", "org.jetbrains.exposed", "exposed-jdbc").version(exposed)
     library("exposed-json", "org.jetbrains.exposed", "exposed-json").version(exposed)
 
-    bundle("exposed", listOf("exposed-core", "exposed-exposed-dao", "exposed-jdbc", "exposed-json"))
-
     library("mysql", "mysql", "mysql-connector-java").version("8.0.33")
     library("hikaricp", "com.zaxxer", "HikariCP").version("5.1.0")
+
+    bundle("exposed", listOf("exposed-core", "exposed-exposed-dao", "exposed-jdbc", "exposed-json", "mysql", "hikaricp"))
 
     fun curseMaven(alias: String, slug: String, id: Int, version: Int) {
         library(alias, "curse.maven", "$slug-$id").version(version.toString())

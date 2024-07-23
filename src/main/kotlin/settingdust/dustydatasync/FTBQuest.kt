@@ -17,7 +17,6 @@ import net.minecraftforge.fml.relauncher.Side
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.insertIgnore
-import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -31,7 +30,7 @@ class FTBQuestData(id: EntityID<UUID>) : PlayerNbtEntity(id, FTBQuestTable) {
     companion object : PlayerNbtEntityClass<FTBQuestData>(FTBQuestTable)
 }
 
-@Mod.EventBusSubscriber(value = [Side.SERVER], modid = DustyDataSync.MODID)
+@Mod.EventBusSubscriber(value = [Side.SERVER], modid = Tags.ID)
 object FTBQuestSyncer {
     private val logger = LogManager.getLogger()
     @JvmStatic private val mutexs = mutableMapOf<UUID, Mutex>()
@@ -54,59 +53,62 @@ object FTBQuestSyncer {
             val uuidString = uuid.toString()
             val localLocked = uuidString in PlayerLocalLocker.players
             var databaseLocked = newSuspendedTransaction {
-                FTBQuestTable.slice(FTBQuestTable.lock)
-                    .select { FTBQuestTable.id eq uuid }
+                FTBQuestTable.select(FTBQuestTable.lock)
+                    .where { FTBQuestTable.id eq uuid }
                     .single()[FTBQuestTable.lock]
             }
 
             while (databaseLocked && !localLocked) {
-                logger.debug("等待玩家 ${forgePlayer.name} 解锁 ${DustyDataSync.Database.syncDelay} 毫秒")
+                logger.debug(
+                    "Waiting ${forgePlayer.name} unlock for ${DustyDataSync.Database.syncDelay}ms")
                 delay(DustyDataSync.Database.syncDelay.milliseconds)
                 if (retryCounter++ < RETRY_COUNT) {
-                    logger.debug("重试次数：$retryCounter")
+                    logger.debug("Retried：$retryCounter")
                     databaseLocked = newSuspendedTransaction {
-                        FTBQuestTable.slice(FTBQuestTable.lock)
-                            .select { FTBQuestTable.id eq uuid }
+                        FTBQuestTable.select(FTBQuestTable.lock)
+                            .where { FTBQuestTable.id eq uuid }
                             .single()[FTBQuestTable.lock]
                     }
                     continue
                 }
                 PlayerKicker.needKick += uuid
-                logger.debug("玩家 ${forgePlayer.name} 数据被锁定且未在本服务器锁定，不允许进入")
+                logger.debug(
+                    "Player ${forgePlayer.name} is locked in database and not locally locked on this server, enter is not allowed.")
                 return@launch
             }
 
             val questData = ServerQuestData.get(forgePlayer.team)
 
             if (databaseLocked) {
-                logger.warn("玩家 ${forgePlayer.name} 在本服务器被锁定，可能是退出时没有正常保存，需要用本地数据覆盖数据库数据")
+                logger.warn(
+                    "Player ${forgePlayer.name} is locked on this server, possibly due to an improper save upon quit; local data will need to override the database data.")
                 newSuspendedTransaction {
                     FTBQuestTable.update({ FTBQuestTable.id eq uuid }) {
-                        it[FTBQuestTable.data] =
+                        it[data] =
                             NBTTagCompound().also {
                                 (questData as ServerQuestDataAccessor).`dustydatasync$writeData`(it)
                             }
                     }
                 }
             } else {
-                logger.debug("玩家 ${forgePlayer.name} 未锁定，加载数据")
+                logger.debug("Player ${forgePlayer.name} is not locked, loading data.")
                 newSuspendedTransaction {
-                    logger.debug("恢复 ${forgePlayer.name} 数据")
+                    logger.debug("Restoring data for ${forgePlayer.name}")
                     val tag =
-                        FTBQuestTable.slice(FTBQuestTable.data)
-                            .select { FTBQuestTable.id eq uuid }
+                        FTBQuestTable.select(FTBQuestTable.data)
+                            .where { FTBQuestTable.id eq uuid }
                             .single()[FTBQuestTable.data]
                     if (tag.isEmpty) {
-                        logger.debug("玩家 ${forgePlayer.name} 数据为空，存储数据")
+                        logger.debug("Player ${forgePlayer.name} data is empty, storing data")
                         FTBQuestTable.update({ FTBQuestTable.id eq uuid }) {
-                            it[FTBQuestTable.data] =
+                            it[data] =
                                 NBTTagCompound().also { tag ->
                                     (questData as ServerQuestDataAccessor)
                                         .`dustydatasync$writeData`(tag)
                                 }
                         }
                     } else {
-                        logger.debug("数据：{}", tag)
+                        logger.debug("Data：{}", tag)
                         (questData as ServerQuestDataAccessor).`dustydatasync$readData`(tag)
                         questData.markDirty()
                         // 非主线程访问会导致 https://github.com/vigna/fastutil/issues/42
@@ -129,7 +131,7 @@ object FTBQuestSyncer {
                 .withLock {
                     if (player.connection.networkManager.isChannelOpen) {
                         // 等待其他数据判断完毕，没有踢出之后再锁定玩家
-                        logger.debug("锁定玩家 ${player.name}")
+                        logger.debug("Locking player ${player.name}")
                         transaction {
                             FTBQuestTable.update({ FTBQuestTable.id eq uuid }) { it[lock] = true }
                         }
@@ -145,7 +147,7 @@ object FTBQuestSyncer {
         // 玩家不是在本地被锁定的，不能存数据进去
         if (uuid.toString() !in PlayerLocalLocker.players) return
         transaction {
-            logger.debug("玩家 ${player.name} 退出，存储数据")
+            logger.debug("Player ${player.name} is exiting, storing data")
 
             FTBQuestTable.update({ FTBQuestTable.id eq uuid }) {
                 it[lock] = false

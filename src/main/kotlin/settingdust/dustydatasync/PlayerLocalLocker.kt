@@ -2,12 +2,6 @@ package settingdust.dustydatasync
 
 import kotlinx.coroutines.launch
 import net.minecraft.entity.player.EntityPlayerMP
-import java.nio.file.Path
-import kotlin.io.path.createFile
-import kotlin.io.path.createParentDirectories
-import kotlin.io.path.div
-import kotlin.io.path.readLines
-import kotlin.io.path.writeLines
 import net.minecraftforge.fml.common.Loader
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.eventhandler.EventPriority
@@ -15,8 +9,14 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.PlayerEvent
 import net.minecraftforge.fml.relauncher.Side
 import org.apache.logging.log4j.LogManager
+import java.nio.file.Path
+import kotlin.io.path.createFile
+import kotlin.io.path.createParentDirectories
+import kotlin.io.path.div
+import kotlin.io.path.readLines
+import kotlin.io.path.writeLines
 
-@Mod.EventBusSubscriber(value = [Side.SERVER], modid = DustyDataSync.MODID)
+@Mod.EventBusSubscriber(value = [Side.SERVER], modid = Tags.ID)
 object PlayerLocalLocker {
     var players: MutableSet<String>
         private set
@@ -44,7 +44,7 @@ object PlayerLocalLocker {
         DustyDataSync.scope.launch ignored@{
             DustyDataSync.serverCoroutineScope.launch {
                 if (!player.connection.networkManager.isChannelOpen) return@launch
-                logger.debug("本地锁定玩家 ${player.name}")
+                logger.debug("Lock ${player.name} locally")
                 players += uuid.toString()
                 save()
             }
@@ -58,7 +58,7 @@ object PlayerLocalLocker {
         val uuid = player.uniqueID
         DustyDataSync.scope.launch {
             DustyDataSync.serverCoroutineScope.launch {
-                logger.debug("本地解锁玩家 ${player.name}")
+                logger.debug("Unlock ${player.name} locally")
                 players -= uuid.toString()
                 save()
             }

@@ -1,8 +1,12 @@
 import groovy.lang.Closure
+import org.jetbrains.gradle.ext.runConfigurations
+import org.jetbrains.gradle.ext.settings
+import org.jetbrains.gradle.ext.taskTriggers
 
 plugins {
     idea
     java
+    `java-library`
     `maven-publish`
     alias(catalog.plugins.idea.ext)
 
@@ -64,7 +68,6 @@ dependencies {
     val mixin = modUtils.enableMixins(catalog.mixinbooter.get().toString(), "$id.refmap.json")
 
     implementation(mixin)
-    shadow(catalog.mixinextras.common) { isTransitive = false }
     annotationProcessor(catalog.mixinextras.common) { isTransitive = false }
 
     implementation(catalog.bundles.exposed)
@@ -98,8 +101,6 @@ tasks {
             exclude(dependency("org.intellij.lang:annotations"))
             exclude(dependency("org.jetbrains.kotlin::"))
             exclude(dependency("org.jetbrains.kotlinx::"))
-
-            relocate("com.llamalad7.mixinextras", "settingdust.mixinextras")
         }
 
         finalizedBy("reobfJar")
@@ -108,4 +109,39 @@ tasks {
     build { dependsOn(shadowJar) }
 
     artifacts { archives(shadowJar) }
+
+    injectTags { outputClassName = "${project.group}.dustydatasync.Tags" }
+
+    processResources {
+        val properties =
+            mapOf(
+                "version" to project.version,
+                "id" to id,
+                "name" to name,
+                "author" to author,
+                "description" to description)
+        inputs.properties(properties)
+        filesMatching("mcmod.info") { expand(properties) }
+    }
+}
+
+idea {
+    module {
+        isDownloadJavadoc = true
+        isDownloadSources = true
+        inheritOutputDirs = true // Fix resources in IJ-Native runs
+    }
+
+    project {
+        settings {
+            runConfigurations {
+                create<Gradle>("1. Run Client") { taskNames = listOf("runClient") }
+                create<Gradle>("2. Run Server") { taskNames = listOf("runServer") }
+                create<Gradle>("3. Run Obfuscated Client") { taskNames = listOf("runObfClient") }
+                create<Gradle>("4. Run Obfuscated Server") { taskNames = listOf("runObfServer") }
+            }
+
+            taskTriggers { afterSync(tasks.injectTags) }
+        }
+    }
 }

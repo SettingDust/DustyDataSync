@@ -33,14 +33,13 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import zone.rong.mixinbooter.ILateMixinLoader
 
 @Mod(
-    modid = DustyDataSync.MODID,
+    modid = Tags.ID,
+    name = Tags.NAME,
+    version = Tags.VERSION,
     acceptableRemoteVersions = "*",
     modLanguageAdapter = "net.shadowfacts.forgelin.KotlinAdapter",
-    serverSideOnly = true
-)
+    serverSideOnly = true)
 object DustyDataSync {
-    const val MODID = "dusty_data_sync"
-
     val logger = LogManager.getLogger()
 
     val scope = CoroutineScope(Dispatchers.IO)
@@ -59,19 +58,19 @@ object DustyDataSync {
 
     @Mod.EventHandler
     fun init(event: FMLInitializationEvent) {
-        ConfigManager.sync(MODID, Config.Type.INSTANCE)
+        ConfigManager.sync(Tags.ID, Config.Type.INSTANCE)
         Database.reload()
     }
 
     @SubscribeEvent
     fun onConfigChangedEvent(event: OnConfigChangedEvent) {
-        if (event.modID == MODID) {
-            ConfigManager.sync(MODID, Config.Type.INSTANCE)
+        if (event.modID == Tags.ID) {
+            ConfigManager.sync(Tags.ID, Config.Type.INSTANCE)
             Database.reload()
         }
     }
 
-    @Config(modid = MODID, category = "database")
+    @Config(modid = Tags.ID, category = "database")
     object Database {
         lateinit var database: org.jetbrains.exposed.sql.Database
             private set
@@ -83,9 +82,9 @@ object DustyDataSync {
 
         @JvmField var databaseUrl = "jdbc:mysql://root:123456@localhost:3306/dusty_data_sync"
 
-        @JvmField @Comment("每次重试恢复数据会等待的的延迟时间，重试次数为 5，单位是毫秒") @RangeInt(min = 0) var syncDelay = 50
+        @JvmField @Comment("Retry delay when restoring. Max 5 times. Unit is ms") @RangeInt(min = 0) var syncDelay = 50
 
-        @JvmField @Comment("显示 SQL 日志") @RangeInt(min = 0) var debug = false
+        @JvmField @Comment("Output the SQL") @RangeInt(min = 0) var debug = false
 
         fun reload() {
             database =
@@ -96,17 +95,12 @@ object DustyDataSync {
                             driverClassName = "com.mysql.cj.jdbc.Driver"
                             maximumPoolSize = 3
                             validate()
-                        }
-                    ),
-                    databaseConfig = DatabaseConfig { if (debug) sqlLogger = Log4jSqlLogger }
-                )
+                        }),
+                    databaseConfig = DatabaseConfig { if (debug) sqlLogger = Log4jSqlLogger })
             TransactionManager.defaultDatabase = database
             transaction {
                 SchemaUtils.createMissingTablesAndColumns(
-                    FTBQuestTable,
-                    GameStagesTable,
-                    FluxNetworksTable
-                )
+                    FTBQuestTable, GameStagesTable, FluxNetworksTable)
             }
         }
 
@@ -117,9 +111,9 @@ object DustyDataSync {
         }
     }
 
-    @Config(modid = MODID, category = "messages")
+    @Config(modid = Tags.ID, category = "messages")
     object Messages {
-        @JvmField var kickLockMessage = "当前玩家在数据库中被锁定"
+        @JvmField var kickLockMessage = "Current player is locked in database"
     }
 
     @Suppress("unused")

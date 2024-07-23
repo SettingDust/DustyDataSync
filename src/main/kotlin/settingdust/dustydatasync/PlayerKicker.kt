@@ -10,7 +10,7 @@ import net.minecraftforge.fml.relauncher.Side
 import org.apache.logging.log4j.LogManager
 import java.util.*
 
-@Mod.EventBusSubscriber(value = [Side.SERVER], modid = DustyDataSync.MODID)
+@Mod.EventBusSubscriber(value = [Side.SERVER], modid = Tags.ID)
 object PlayerKicker {
     val needKick = mutableSetOf<UUID>()
 
@@ -21,7 +21,7 @@ object PlayerKicker {
         val player = event.player as EntityPlayerMP
         val uuid = player.uniqueID
         if (uuid in needKick) {
-            logger.debug("踢出玩家 {}", player.name)
+            logger.debug("Kick {}", player.name)
             player.connection.disconnect(
                 TextComponentString(DustyDataSync.Messages.kickLockMessage)
             )

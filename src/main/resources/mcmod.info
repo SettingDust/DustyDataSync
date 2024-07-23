@@ -1,14 +1,14 @@
 [
   {
-    "modid": "dusty_data_sync",
-    "name": "Dusty Data Sync",
-    "description": "",
+    "modid": "$id",
+    "name": "$name",
+    "description": "$description",
     "version": "${version}",
     "mcversion": "${mcversion}",
     "url": "",
     "updateUrl": "",
     "authorList": [
-      "SettingDust"
+      "$author"
     ],
     "credits": "Authors of this project",
     "logoFile": "",
