@@ -115,7 +115,6 @@ object GameStagesSyncer {
                 .getOrPut(uuid) { Mutex() }
                 .withLock {
                     if (player.connection.networkManager.isChannelOpen) {
-
                         // 等待其他数据判断完毕，没有踢出之后再锁定玩家
                         logger.debug("Locking player ${player.name}")
                         transaction {

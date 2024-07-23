@@ -50,7 +50,7 @@ object DustyDataSync {
     @Mod.EventHandler
     fun preInit(event: FMLPreInitializationEvent) {
         MinecraftForge.EVENT_BUS.register(this)
-        PlayerLocalLocker
+        requireNotNull(PlayerLocalLocker)
         serverCoroutineDispatcher =
             MinecraftServerExecutor(FMLServerHandler.instance().server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
