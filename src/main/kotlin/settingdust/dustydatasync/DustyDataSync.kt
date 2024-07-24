@@ -19,6 +19,7 @@ import net.minecraftforge.fml.client.event.ConfigChangedEvent.OnConfigChangedEve
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.event.FMLInitializationEvent
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent
+import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.server.FMLServerHandler
 import org.apache.logging.log4j.LogManager
@@ -48,11 +49,11 @@ object DustyDataSync {
     lateinit var serverCoroutineDispatcher: CoroutineDispatcher
 
     @Mod.EventHandler
-    fun preInit(event: FMLPreInitializationEvent) {
+    fun preInit(event: FMLServerAboutToStartEvent) {
         MinecraftForge.EVENT_BUS.register(this)
         requireNotNull(PlayerLocalLocker)
         serverCoroutineDispatcher =
-            MinecraftServerExecutor(FMLServerHandler.instance().server).asCoroutineDispatcher()
+            MinecraftServerExecutor(event.server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
     }
 
@@ -84,7 +85,7 @@ object DustyDataSync {
 
         @JvmField @Comment("Retry delay when restoring. Max 5 times. Unit is ms") @RangeInt(min = 0) var syncDelay = 50
 
-        @JvmField @Comment("Output the SQL") @RangeInt(min = 0) var debug = false
+        @JvmField @Comment("Output the SQL") var debug = false
 
         fun reload() {
             database =

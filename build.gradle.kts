@@ -68,7 +68,11 @@ repositories {
 dependencies {
     val mixin = modUtils.enableMixins(catalog.mixinbooter.get().toString(), "$id.refmap.json")
 
-    implementation(mixin)
+    implementation(catalog.mixinbooter)
+    annotationProcessor("org.ow2.asm:asm-debug-all:5.2")
+    annotationProcessor("com.google.guava:guava:24.1.1-jre")
+    annotationProcessor("com.google.code.gson:gson:2.8.6")
+    annotationProcessor(mixin)
     annotationProcessor(catalog.mixinextras.common) { isTransitive = false }
 
     implementation(catalog.bundles.exposed)
@@ -94,33 +98,37 @@ dependencies {
 tasks {
     shadowJar {
         configurations = listOf(project.configurations.shadow.get())
-        archiveClassifier.set("")
+        archiveClassifier = "deobf"
         mergeServiceFiles()
+        minimize()
 
         dependencies {
             exclude(dependency("org.jetbrains:annotations"))
             exclude(dependency("org.intellij.lang:annotations"))
             exclude(dependency("org.jetbrains.kotlin::"))
             exclude(dependency("org.jetbrains.kotlinx::"))
+            exclude(dependency("org.slf4j::"))
         }
-
-        finalizedBy("reobfJar")
     }
 
-    build { dependsOn(shadowJar) }
+    reobfJar {
+        dependsOn(shadowJar)
 
-    artifacts { archives(shadowJar) }
+        inputJar.set(shadowJar.map { it.archiveFile }.get())
+    }
 
-    injectTags { outputClassName = "${project.group}.dustydatasync.Tags" }
+    injectTags {
+        outputClassName = "${project.group}.dustydatasync.Tags"
+    }
 
     processResources {
         val properties =
             mapOf(
                 "version" to project.version,
                 "id" to id,
-                "name" to name,
+                "name" to project.name,
                 "author" to author,
-                "description" to description)
+                "description" to project.description)
         inputs.properties(properties)
         filesMatching("mcmod.info") { expand(properties) }
     }
