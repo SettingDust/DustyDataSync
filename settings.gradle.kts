@@ -11,14 +11,14 @@ apply("https://github.com/SettingDust/MinecraftGradleScripts/raw/main/mixin.grad
 dependencyResolutionManagement.versionCatalogs.named("catalog") {
     val exposed = "0.52.0"
     library("exposed-core", "org.jetbrains.exposed", "exposed-core").version(exposed)
-    library("exposed-exposed-dao", "org.jetbrains.exposed", "exposed-dao").version(exposed)
+    library("exposed-dao", "org.jetbrains.exposed", "exposed-dao").version(exposed)
     library("exposed-jdbc", "org.jetbrains.exposed", "exposed-jdbc").version(exposed)
     library("exposed-json", "org.jetbrains.exposed", "exposed-json").version(exposed)
 
     library("mysql", "mysql", "mysql-connector-java").version("8.0.33")
     library("hikaricp", "com.zaxxer", "HikariCP").version("5.1.0")
 
-    bundle("exposed", listOf("exposed-core", "exposed-exposed-dao", "exposed-jdbc", "exposed-json", "mysql", "hikaricp"))
+    bundle("exposed", listOf("exposed-core", "exposed-dao", "exposed-jdbc", "exposed-json", "mysql", "hikaricp"))
 
     fun curseMaven(alias: String, slug: String, id: Int, version: Int) {
         library(alias, "curse.maven", "$slug-$id").version(version.toString())
