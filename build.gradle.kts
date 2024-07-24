@@ -100,7 +100,6 @@ tasks {
         configurations = listOf(project.configurations.shadow.get())
         archiveClassifier = "deobf"
         mergeServiceFiles()
-        minimize()
 
         dependencies {
             exclude(dependency("org.jetbrains:annotations"))
