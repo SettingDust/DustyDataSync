@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2024-07-30
+### :sparkles: New Features
+- [`06bf06f`](https://github.com/SettingDust/DustyDataSync/commit/06bf06fcf48b86bfc54ca074a4aea9eb492b418e) - use mariadb jdbc driver *(commit by [@SettingDust](https://github.com/SettingDust))*
+
+
 ## [1.1.6] - 2024-07-30
 ### :bug: Bug Fixes
 - [`c32358a`](https://github.com/SettingDust/DustyDataSync/commit/c32358a6f84ca30d815b91ecba8ec67d030976a8) - create lock file *(commit by [@SettingDust](https://github.com/SettingDust))*
@@ -43,3 +48,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.3]: https://github.com/SettingDust/DustyDataSync/compare/1.1.2...1.1.3
 [1.1.4]: https://github.com/SettingDust/DustyDataSync/compare/1.1.3...1.1.4
 [1.1.6]: https://github.com/SettingDust/DustyDataSync/compare/1.1.5...1.1.6
+[1.2.0]: https://github.com/SettingDust/DustyDataSync/compare/1.1.6...1.2.0
