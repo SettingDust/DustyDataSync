@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2024-07-30
+### :bug: Bug Fixes
+- [`5dcd2ae`](https://github.com/SettingDust/DustyDataSync/commit/5dcd2ae3136c6181a2e63038fda58822d8cf5147) - add condition for syncer to avoid crash when mod lacking *(commit by [@SettingDust](https://github.com/SettingDust))*
+
+
 ## [1.1.2] - 2024-07-24
 ### :bug: Bug Fixes
 - [`6e9bf0e`](https://github.com/SettingDust/DustyDataSync/commit/6e9bf0eab5abafc132c0dbda5fe5ef2d37485834) - remove minimize from shadow for services *(commit by [@SettingDust](https://github.com/SettingDust))*
@@ -24,3 +29,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/SettingDust/DustyDataSync/compare/1.0.0...1.1.0
 [1.1.1]: https://github.com/SettingDust/DustyDataSync/compare/1.1.0...1.1.1
 [1.1.2]: https://github.com/SettingDust/DustyDataSync/compare/1.1.1...1.1.2
+[1.1.3]: https://github.com/SettingDust/DustyDataSync/compare/1.1.2...1.1.3
