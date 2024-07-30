@@ -106,7 +106,6 @@ tasks {
             exclude(dependency("org.intellij.lang:annotations"))
             exclude(dependency("org.jetbrains.kotlin::"))
             exclude(dependency("org.jetbrains.kotlinx::"))
-            exclude(dependency("org.slf4j::"))
         }
     }
 
