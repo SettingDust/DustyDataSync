@@ -27,10 +27,8 @@ object PlayerLocalLocker {
     init {
         val configDir = Loader.instance().configDir
         configFile = configDir.toPath() / "locks.txt"
-        try {
-            configFile.createParentDirectories()
-            configFile.createFile()
-        } catch (_: Throwable) {}
+        runCatching { configFile.createParentDirectories() }
+        runCatching { configFile.createFile() }
         players = configFile.readLines().toMutableSet()
     }
 
