@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2024-07-30
+### :bug: Bug Fixes
+- [`467cca3`](https://github.com/SettingDust/DustyDataSync/commit/467cca34889a37fa1bfddd7f6f4eeec26dedc18e) - use hikaricp 4 for java 8 *(commit by [@SettingDust](https://github.com/SettingDust))*
+
+
 ## [1.1.3] - 2024-07-30
 ### :bug: Bug Fixes
 - [`5dcd2ae`](https://github.com/SettingDust/DustyDataSync/commit/5dcd2ae3136c6181a2e63038fda58822d8cf5147) - add condition for syncer to avoid crash when mod lacking *(commit by [@SettingDust](https://github.com/SettingDust))*
@@ -30,3 +35,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.1]: https://github.com/SettingDust/DustyDataSync/compare/1.1.0...1.1.1
 [1.1.2]: https://github.com/SettingDust/DustyDataSync/compare/1.1.1...1.1.2
 [1.1.3]: https://github.com/SettingDust/DustyDataSync/compare/1.1.2...1.1.3
+[1.1.4]: https://github.com/SettingDust/DustyDataSync/compare/1.1.3...1.1.4
