@@ -15,7 +15,7 @@ dependencyResolutionManagement.versionCatalogs.named("catalog") {
     library("exposed-jdbc", "org.jetbrains.exposed", "exposed-jdbc").version(exposed)
     library("exposed-json", "org.jetbrains.exposed", "exposed-json").version(exposed)
 
-    library("mysql", "mysql", "mysql-connector-java").version("8.0.33")
+    library("mysql", "org.mariadb.jdbc", "mariadb-java-client").version("3.4.1")
     library("hikaricp", "com.zaxxer", "HikariCP").version("4.0.3")
 
     bundle("exposed", listOf("exposed-core", "exposed-dao", "exposed-jdbc", "exposed-json", "mysql", "hikaricp"))

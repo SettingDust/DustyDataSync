@@ -91,7 +91,7 @@ object DustyDataSync {
         //            databaseConfig = DatabaseConfig { sqlLogger = Log4jSqlLogger }
         //        )
 
-        @JvmField var databaseUrl = "jdbc:mysql://root:123456@localhost:3306/dusty_data_sync"
+        @JvmField var databaseUrl = "jdbc:mariadb:://localhost:3306/dusty_data_sync?user=root&password=123456"
 
         @JvmField @Comment("Retry delay when restoring. Max 5 times. Unit is ms") @RangeInt(min = 0) var syncDelay = 50
 
@@ -103,7 +103,7 @@ object DustyDataSync {
                     HikariDataSource(
                         HikariConfig().apply {
                             jdbcUrl = databaseUrl
-                            driverClassName = "com.mysql.cj.jdbc.Driver"
+                            driverClassName = "org.mariadb.jdbc.Driver"
                             maximumPoolSize = 3
                             validate()
                         }),
