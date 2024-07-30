@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2024-07-30
+### :bug: Bug Fixes
+- [`c32358a`](https://github.com/SettingDust/DustyDataSync/commit/c32358a6f84ca30d815b91ecba8ec67d030976a8) - create lock file *(commit by [@SettingDust](https://github.com/SettingDust))*
+- [`a59e795`](https://github.com/SettingDust/DustyDataSync/commit/a59e795888e26b3a31351b4490cceb03aa08bea0) - shadow slf4j *(commit by [@SettingDust](https://github.com/SettingDust))*
+
+
 ## [1.1.4] - 2024-07-30
 ### :bug: Bug Fixes
 - [`467cca3`](https://github.com/SettingDust/DustyDataSync/commit/467cca34889a37fa1bfddd7f6f4eeec26dedc18e) - use hikaricp 4 for java 8 *(commit by [@SettingDust](https://github.com/SettingDust))*
@@ -36,3 +42,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.2]: https://github.com/SettingDust/DustyDataSync/compare/1.1.1...1.1.2
 [1.1.3]: https://github.com/SettingDust/DustyDataSync/compare/1.1.2...1.1.3
 [1.1.4]: https://github.com/SettingDust/DustyDataSync/compare/1.1.3...1.1.4
+[1.1.6]: https://github.com/SettingDust/DustyDataSync/compare/1.1.5...1.1.6
