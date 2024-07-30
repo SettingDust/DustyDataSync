@@ -4,11 +4,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import net.darkhax.gamestages.GameStages
 import net.darkhax.gamestages.data.IStageData
 import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraftforge.event.entity.player.PlayerEvent
 import net.minecraftforge.fml.common.Mod
+import net.minecraftforge.fml.common.Optional
 import net.minecraftforge.fml.common.eventhandler.EventPriority
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent
@@ -28,7 +30,6 @@ class GameStagesData(id: EntityID<UUID>) : PlayerNbtEntity(id, GameStagesTable) 
     companion object : PlayerNbtEntityClass<GameStagesData>(GameStagesTable)
 }
 
-@Mod.EventBusSubscriber(value = [Side.SERVER], modid = Tags.ID)
 object GameStagesSyncer {
     @JvmStatic private val logger = LogManager.getLogger()
     @JvmStatic private val mutexs = mutableMapOf<UUID, Mutex>()

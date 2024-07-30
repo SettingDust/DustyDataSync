@@ -1,5 +1,6 @@
 package settingdust.dustydatasync
 
+import com.feed_the_beast.ftbquests.FTBQuests
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.CoroutineDispatcher
@@ -16,12 +17,11 @@ import net.minecraftforge.common.config.Config.Comment
 import net.minecraftforge.common.config.Config.RangeInt
 import net.minecraftforge.common.config.ConfigManager
 import net.minecraftforge.fml.client.event.ConfigChangedEvent.OnConfigChangedEvent
+import net.minecraftforge.fml.common.Loader
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.event.FMLInitializationEvent
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent
 import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
-import net.minecraftforge.fml.server.FMLServerHandler
 import org.apache.logging.log4j.LogManager
 import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -31,6 +31,7 @@ import org.jetbrains.exposed.sql.statements.StatementContext
 import org.jetbrains.exposed.sql.statements.expandArgs
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import sonar.fluxnetworks.FluxNetworks
 import zone.rong.mixinbooter.ILateMixinLoader
 
 @Mod(
@@ -55,6 +56,15 @@ object DustyDataSync {
         serverCoroutineDispatcher =
             MinecraftServerExecutor(event.server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
+        if (Loader.isModLoaded("gamestages")) {
+            MinecraftForge.EVENT_BUS.register(GameStagesSyncer)
+        }
+        if (Loader.isModLoaded(FTBQuests.MOD_ID)) {
+            MinecraftForge.EVENT_BUS.register(FTBQuestSyncer)
+        }
+//        if (Loader.isModLoaded(FluxNetworks.MODID)) {
+//            MinecraftForge.EVENT_BUS.register(FluxNetworksSyncer)
+//        }
     }
 
     @Mod.EventHandler

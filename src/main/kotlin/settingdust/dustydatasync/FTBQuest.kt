@@ -30,7 +30,6 @@ class FTBQuestData(id: EntityID<UUID>) : PlayerNbtEntity(id, FTBQuestTable) {
     companion object : PlayerNbtEntityClass<FTBQuestData>(FTBQuestTable)
 }
 
-@Mod.EventBusSubscriber(value = [Side.SERVER], modid = Tags.ID)
 object FTBQuestSyncer {
     private val logger = LogManager.getLogger()
     @JvmStatic private val mutexs = mutableMapOf<UUID, Mutex>()
