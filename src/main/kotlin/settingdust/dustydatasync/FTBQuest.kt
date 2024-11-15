@@ -1,6 +1,7 @@
 package settingdust.dustydatasync
 
 import com.feed_the_beast.ftblib.events.player.ForgePlayerLoggedInEvent
+import com.feed_the_beast.ftblib.events.player.ForgePlayerLoggedOutEvent
 import com.feed_the_beast.ftblib.lib.data.Universe
 import com.feed_the_beast.ftbquests.util.ServerQuestData
 import kotlinx.coroutines.delay
@@ -10,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import net.minecraft.entity.player.EntityPlayerMP
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraftforge.fml.common.Mod
+import net.minecraftforge.fml.common.event.FMLServerStoppingEvent
 import net.minecraftforge.fml.common.eventhandler.EventPriority
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import net.minecraftforge.fml.common.gameevent.PlayerEvent
@@ -140,9 +142,10 @@ object FTBQuestSyncer {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    fun onPlayerLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
+    fun onPlayerLogout(event: ForgePlayerLoggedOutEvent) {
         val player = event.player
-        val uuid = player.uniqueID
+        val uuid = player.player.uniqueID
+        if (Universe.get() == null) return
         // 玩家不是在本地被锁定的，不能存数据进去
         if (uuid.toString() !in PlayerLocalLocker.players) return
         transaction {
@@ -152,7 +155,7 @@ object FTBQuestSyncer {
                 it[lock] = false
                 it[data] =
                     NBTTagCompound().also {
-                        (ServerQuestData.get(Universe.get().getPlayer(player).team)
+                        (ServerQuestData.get(player.team)
                                 as ServerQuestDataAccessor)
                             .`dustydatasync$writeData`(it)
                     }

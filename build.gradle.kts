@@ -93,6 +93,8 @@ dependencies {
     runtimeOnly(catalog.crafttweaker)
 
     implementation(catalog.flux.networks)
+
+    shadow("org.apache.logging.log4j:log4j-slf4j-impl:2.24.1")
 }
 
 tasks {
