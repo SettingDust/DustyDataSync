@@ -1,131 +1,166 @@
 package settingdust.dustydatasync
 
+import com.mongodb.client.model.Filters
+import com.mongodb.client.model.ReplaceOptions
+import com.mongodb.client.model.UpdateOneModel
+import com.mongodb.client.model.Updates
+import com.mongodb.client.model.changestream.FullDocument
+import com.mongodb.client.model.changestream.OperationType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
-import org.apache.logging.log4j.LogManager
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IdTable
-import org.jetbrains.exposed.sql.insertIgnore
-import org.jetbrains.exposed.sql.json.json
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.upsert
 import sonar.fluxnetworks.api.network.IFluxNetwork
+import sonar.fluxnetworks.api.utils.ICustomValue
 import sonar.fluxnetworks.api.utils.NBTType
+import sonar.fluxnetworks.common.connection.FluxNetworkBase
+import sonar.fluxnetworks.common.connection.FluxNetworkCache
 import sonar.fluxnetworks.common.connection.FluxNetworkServer
 import sonar.fluxnetworks.common.data.FluxNetworkData
+import kotlin.time.Duration.Companion.milliseconds
 
-object FluxNetworksTable : IdTable<Int>() {
-    override val id = integer("id").entityId()
-
-    val hash = integer("hash").default(0)
-
-    val data = json<NBTTagCompound>("data", json, NBTTagCompoundSerializer)
-
-    override val primaryKey = PrimaryKey(id)
+@Serializable
+data class SyncedFluxNetwork(
+    @SerialName("_id") val id: Int? = null,
+    val data: @Contextual NBTTagCompound? = null
+) {
+    companion object {
+        const val COLLECTION = "flux_networks"
+    }
 }
 
-class FluxNetworksData(id: EntityID<Int>) : IntEntity(id) {
-    companion object : IntEntityClass<FluxNetworksData>(FluxNetworksTable)
+data class ObservableCustomValue<T>(val wrapped: ICustomValue<T>) : ICustomValue<T> by wrapped {
+    var updates = MutableSharedFlow<Pair<T, T>>()
 
-    var hash by FluxNetworksTable.hash
-    var data by FluxNetworksTable.data
+    override fun setValue(value: T) {
+        if (wrapped.value != value && value != null) {
+            val old = wrapped.value
+            wrapped.value = value
+            runBlocking { updates.emit(old to value) }
+        }
+    }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class)
 object FluxNetworksSyncer {
-    @JvmStatic private val logger = LogManager.getLogger()
+    val updates = MutableSharedFlow<IFluxNetwork>()
 
-    @JvmStatic
-    fun onLoadData() {
-        val fluxNetworkData = FluxNetworkData.get()
+    @OptIn(FlowPreview::class)
+    fun FluxNetworkBase.observeValues() = merge(
+        (network_name as ObservableCustomValue<*>).updates,
+        (network_owner as ObservableCustomValue<*>).updates,
+        (network_security as ObservableCustomValue<*>).updates,
+        (network_password as ObservableCustomValue<*>).updates,
+        (network_color as ObservableCustomValue<*>).updates,
+        (network_energy as ObservableCustomValue<*>).updates,
+        (network_wireless as ObservableCustomValue<*>).updates,
+        (network_stats as ObservableCustomValue<*>).updates,
+        (network_players as ObservableCustomValue<*>).updates
+    )
+        .flowOn(Dispatchers.IO)
+        .debounce(50.milliseconds)
+        .onEach { updates.emit(this) }
+        .launchIn(DustyDataSync.serverCoroutineScope)
 
-        // 移除不在数据库里的网络
-        transaction {
-            val networksInDatabase =
-                FluxNetworksTable.select(FluxNetworksTable.id)
-                    .where { FluxNetworksTable.id inList fluxNetworkData.networks.keys }
-                    .map { it[FluxNetworksTable.id].value }
-            fluxNetworkData.networks.keys.removeIf { it !in networksInDatabase }
-        }
+    var syncing = false
 
-        transaction {
-            for (id in
-                FluxNetworksTable.select(FluxNetworksTable.id).map {
-                    it[FluxNetworksTable.id].value
-                }) {
-                fluxNetworkData.networks.putIfAbsent(id, FluxNetworkServer())
-                val network = fluxNetworkData.networks[id]!!
-                val hash =
-                    FluxNetworksTable.select(FluxNetworksTable.hash)
-                        .where { FluxNetworksTable.id eq id }
-                        .single()[FluxNetworksTable.hash]
-                if (network.toNbt().hashCode() != hash) {
-                    val data =
-                        FluxNetworksTable.select(FluxNetworksTable.data)
-                            .where { FluxNetworksTable.id eq id }
-                            .single()[FluxNetworksTable.data]
-                    network.readNetworkNBT(data, NBTType.NETWORK_GENERAL)
-                    network.readNetworkNBT(data, NBTType.NETWORK_PLAYERS)
-                    logger.debug("Loading network ${network.networkID} ${network.networkName}")
+    fun <T> FluxNetworkBase.emitUpdate(value: ObservableCustomValue<T>) = runBlocking {
+        value.updates.emit(value.value to value.value)
+    }
+
+    init {
+        val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
+        updates
+            .bufferTimeout(Int.MAX_VALUE, 100.milliseconds)
+            .onEach { networks ->
+                collection.bulkWrite(
+                    networks.map { network ->
+                        UpdateOneModel(
+                            Filters.eq("_id", network.networkID),
+                            Updates.set(SyncedFluxNetwork::data.name, network)
+                        )
+                    }
+                )
+            }.launchIn(DustyDataSync.scope)
+
+        collection.watch()
+            .fullDocument(FullDocument.UPDATE_LOOKUP)
+            .onEach { document ->
+                syncing = true
+                when (document.operationType) {
+                    OperationType.INSERT -> {
+                        FluxNetworkData.get().addNetwork(FluxNetworkServer().also {
+                            it.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_GENERAL)
+                            it.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_PLAYERS)
+                        })
+                    }
+
+                    OperationType.UPDATE -> {
+                        val id = document.documentKey!!.getInt32("_id").value
+                        val network = FluxNetworkCache.instance.getNetwork(id)
+                        if (document.fullDocument == null) return@onEach
+                        network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_GENERAL)
+                        network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_PLAYERS)
+                    }
+
+                    OperationType.REPLACE -> {
+                        val id = document.documentKey!!.getInt32("_id").value
+                        val network = FluxNetworkCache.instance.getNetwork(id)
+                        network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_GENERAL)
+                        network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_PLAYERS)
+                    }
+
+                    OperationType.DELETE -> {
+                        val id = document.documentKey!!.getInt32("_id").value
+                        FluxNetworkData.get().removeNetwork(FluxNetworkCache.instance.getNetwork(id))
+                    }
+
+                    OperationType.DROP -> {
+                        for (network in FluxNetworkData.get().networks.values) {
+                            FluxNetworkData.get().removeNetwork(network)
+                        }
+                    }
+
+                    else -> {}
                 }
+                syncing = false
             }
-        }
+            .launchIn(DustyDataSync.scope)
     }
 
-    @JvmStatic
-    fun loadNetwork(id: Int) = transaction {
-        val fluxNetworkData = FluxNetworkData.get()
-        val data = FluxNetworksData.findById(id) ?: return@transaction
-        fluxNetworkData.networks.putIfAbsent(id, FluxNetworkServer())
-        val network = fluxNetworkData.networks[id]!!
-        if (network.toNbt().hashCode() != data.hash) {
-            network.readNetworkNBT(data.data, NBTType.NETWORK_GENERAL)
-            network.readNetworkNBT(data.data, NBTType.NETWORK_PLAYERS)
-            logger.debug("Loading network ${network.networkID} ${network.networkName}")
-        }
+    fun addNetwork(network: IFluxNetwork) = runBlocking {
+        if (syncing) return@runBlocking
+        val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
+        collection.replaceOne(
+            Filters.eq("_id", network.networkID), SyncedFluxNetwork(network.networkID, network.toNbt()),
+            ReplaceOptions().upsert(true)
+        )
     }
 
-    @JvmStatic
-    fun onRemoveNetwork(network: IFluxNetwork) {
-        logger.debug("Removing network ${network.networkID} ${network.networkName}")
-        transaction { FluxNetworksData.findById(network.networkID)?.delete() }
+    fun removeNetwork(network: IFluxNetwork) = runBlocking {
+        if (syncing) return@runBlocking
+        val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
+        collection.deleteOne(Filters.eq("_id", network.networkID))
     }
-
-    @JvmStatic
-    fun onAddNetwork(network: IFluxNetwork) {
-        val id = network.networkID
-        transaction {
-            logger.debug("Adding network ${network.networkID} ${network.networkName}")
-            FluxNetworksTable.insertIgnore {
-                it[FluxNetworksTable.id] = id
-                val nbt = network.toNbt()
-                it[data] = nbt
-                it[hash] = nbt.hashCode()
-            }
-        }
-    }
-
-    @JvmStatic
-    fun onModify(network: IFluxNetwork) {
-        val id = network.networkID
-        val nbt = network.toNbt()
-        val hashCode = nbt.hashCode()
-        transaction {
-            if (FluxNetworksData[id].hash != hashCode)
-                logger.debug("Modifying network ${network.networkID} ${network.networkName}")
-            FluxNetworksTable.upsert {
-                it[FluxNetworksTable.id] = id
-                it[data] = nbt
-                it[hash] = hashCode
-            }
-        }
-    }
-
-    private fun IFluxNetwork.toNbt() =
-        NBTTagCompound().also {
-            try {
-                FluxNetworkData.writePlayers(this, it)
-                writeNetworkNBT(it, NBTType.NETWORK_GENERAL)
-            } catch (_: Throwable) {}
-        }
 }
+
+
+fun IFluxNetwork.toNbt() =
+    NBTTagCompound().also {
+        try {
+            FluxNetworkData.writePlayers(this, it)
+            writeNetworkNBT(it, NBTType.NETWORK_GENERAL)
+        } catch (_: Throwable) {
+        }
+    }

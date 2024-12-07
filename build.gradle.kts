@@ -1,8 +1,8 @@
 import groovy.lang.Closure
+import org.jetbrains.gradle.ext.Gradle
 import org.jetbrains.gradle.ext.runConfigurations
 import org.jetbrains.gradle.ext.settings
 import org.jetbrains.gradle.ext.taskTriggers
-import org.jetbrains.gradle.ext.Gradle
 
 plugins {
     idea
@@ -22,7 +22,8 @@ plugins {
 }
 
 apply(
-    "https://github.com/SettingDust/MinecraftGradleScripts/raw/main/gradle_issue_15754.gradle.kts")
+    "https://github.com/SettingDust/MinecraftGradleScripts/raw/main/gradle_issue_15754.gradle.kts"
+)
 
 group = "settingdust"
 
@@ -55,7 +56,8 @@ minecraft {
     username = "Developer"
 
     extraRunJvmArguments.addAll(
-        "-Dmixin.hotSwap=true", "-Dmixin.checks.interfaces=true", "-Dmixin.debug.export=true")
+        "-Dmixin.hotSwap=true", "-Dmixin.checks.interfaces=true", "-Dmixin.debug.export=true"
+    )
 
     injectedTags.set(mapOf("VERSION" to project.version, "ID" to id, "NAME" to name))
 }
@@ -75,26 +77,24 @@ dependencies {
     annotationProcessor(mixin)
     annotationProcessor(catalog.mixinextras.common) { isTransitive = false }
 
-    implementation(catalog.bundles.exposed)
-    shadow(catalog.bundles.exposed)
-
     implementation(catalog.kotlinx.coroutines)
     implementation(catalog.kotlinx.serialization.json)
 
     implementation(catalog.kotlin.forge)
 
-    implementation(catalog.ftb.quests)
-    implementation(catalog.ftb.library)
+    implementation(catalog.mongodb.driver)
+    implementation(catalog.kotlinx.bson)
+
+    implementation(rfg.deobf(catalog.ftb.quests.get().toString()))
+    implementation(rfg.deobf(catalog.ftb.library.get().toString()))
     runtimeOnly(catalog.item.filters)
 
-    implementation(catalog.game.stages)
-    implementation(catalog.item.stages)
+    implementation(rfg.deobf(catalog.game.stages.get().toString()))
+    implementation(rfg.deobf(catalog.item.stages.get().toString()))
     runtimeOnly(catalog.bookshelf)
     runtimeOnly(catalog.crafttweaker)
 
-    implementation(catalog.flux.networks)
-
-    shadow("org.apache.logging.log4j:log4j-slf4j-impl:2.24.1")
+    implementation(rfg.deobf(catalog.flux.networks.get().toString()))
 }
 
 tasks {
@@ -108,6 +108,13 @@ tasks {
             exclude(dependency("org.intellij.lang:annotations"))
             exclude(dependency("org.jetbrains.kotlin::"))
             exclude(dependency("org.jetbrains.kotlinx::"))
+        }
+
+        manifest {
+            attributes(
+                "FMLCorePlugin" to "settingdust.dustydatasync.EarlyMixinLoader",
+                "FMLCorePluginContainsFMLMod" to true
+            )
         }
     }
 
@@ -128,7 +135,8 @@ tasks {
                 "id" to id,
                 "name" to project.name,
                 "author" to author,
-                "description" to project.description)
+                "description" to project.description
+            )
         inputs.properties(properties)
         filesMatching("mcmod.info") { expand(properties) }
     }

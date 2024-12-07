@@ -20,6 +20,10 @@ dependencyResolutionManagement.versionCatalogs.named("catalog") {
 
     bundle("exposed", listOf("exposed-core", "exposed-dao", "exposed-jdbc", "exposed-json", "mysql", "hikaricp"))
 
+    val mongo = "5.2.0"
+    library("mongodb-driver", "org.mongodb", "mongodb-driver-kotlin-coroutine").version(mongo)
+    library("kotlinx-bson", "org.mongodb", "bson-kotlinx").version(mongo)
+
     fun curseMaven(alias: String, slug: String, id: Int, version: Int) {
         library(alias, "curse.maven", "$slug-$id").version(version.toString())
     }
@@ -36,6 +40,10 @@ dependencyResolutionManagement.versionCatalogs.named("catalog") {
     library("crafttweaker", "CraftTweaker2", "CraftTweaker2-MC1120-Main").version("1.12-4.1.20.648")
 
     curseMaven("flux-networks", 248020, 3178199)
+
+    library("mixinbooter", "zone.rong", "mixinbooter").version("10.2")
+
+//    library("kotlin-forge", "io.github.chaosunity.forgelin", "Forgelin-Continuous").version("2.1.0.0")
 }
 
 plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0" }

@@ -1,4 +1,4 @@
-package settingdust.dustydatasync.mixin.ftbquests;
+package settingdust.dustydatasync.mixin.late.ftbquests;
 
 import com.feed_the_beast.ftblib.lib.data.ForgePlayer;
 import com.feed_the_beast.ftblib.lib.data.Universe;

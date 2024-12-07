@@ -1,19 +1,18 @@
 {
-  "required": true,
-  "minVersion": "0.8",
-  "package": "settingdust.dustydatasync.mixin",
-  "compatibilityLevel": "JAVA_8",
-  "refmap": "dusty_data_sync.refmap.json",
-  "mixins": [
-    "fluxnetwork.MixinFluxNetworkBase",
-    "fluxnetwork.MixinFluxNetworkCache",
-    "fluxnetwork.MixinFluxNetworkData",
-    "fluxnetwork.MixinFluxNetworkServer",
-    "ftbquests.MixinForgePlayer",
-    "ftbquests.MixinServerQuestData",
-    "ftbquests.ServerQuestDataAccessor",
-    "gamestages.MixinGameStageSaveHandler"
-  ],
-  "client": [
-  ]
+    "required": true,
+    "minVersion": "0.8",
+    "package": "settingdust.dustydatasync.mixin.late",
+    "compatibilityLevel": "JAVA_8",
+    "refmap": "dusty_data_sync.refmap.json",
+    "mixins": [
+        "fluxnetwork.MixinFluxNetworkBase",
+        "fluxnetwork.MixinFluxNetworkData",
+        "fluxnetwork.MixinFluxNetworkServer",
+        "ftblib.MixinUniverse",
+        "ftbquests.MixinForgePlayer",
+        "ftbquests.MixinServerQuestData",
+        "gamestages.MixinGameStageSaveHandler"
+    ],
+    "client": [
+    ]
 }

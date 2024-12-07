@@ -1,0 +1,17 @@
+{
+    "required": true,
+    "minVersion": "0.8",
+    "package": "settingdust.dustydatasync.mixin.early",
+    "compatibilityLevel": "JAVA_8",
+    "refmap": "dusty_data_sync.refmap.json",
+    "mixins": [
+        "serialization.NBTBaseAccessor",
+        "serialization.NBTTagByteArrayAccessor",
+        "serialization.NBTTagCompoundAccessor",
+        "serialization.NBTTagEndAccessor",
+        "serialization.NBTTagIntArrayAccessor",
+        "serialization.NBTTagLongArrayAccessor"
+    ],
+    "client": [
+  ]
+}

@@ -62,6 +62,7 @@ jobs:
             game-stages(optional)
             item-stages(optional)
             ftb-quests-forge(optional)
+            mongo-runtime#(ignore:curseforge)
             
 
           java: |

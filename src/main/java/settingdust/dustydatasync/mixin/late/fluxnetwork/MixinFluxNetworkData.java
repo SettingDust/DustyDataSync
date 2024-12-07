@@ -1,4 +1,4 @@
-package settingdust.dustydatasync.mixin.fluxnetwork;
+package settingdust.dustydatasync.mixin.late.fluxnetwork;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,11 +12,11 @@ import sonar.fluxnetworks.common.data.FluxNetworkData;
 public class MixinFluxNetworkData {
     @Inject(method = "addNetwork", at = @At(value = "TAIL"))
     private void dustydatasync$add(IFluxNetwork network, CallbackInfo ci) {
-        FluxNetworksSyncer.onAddNetwork(network);
+        FluxNetworksSyncer.INSTANCE.addNetwork(network);
     }
 
     @Inject(method = "removeNetwork", at = @At(value = "HEAD"))
     private void dustydatasync$remove(IFluxNetwork network, CallbackInfo ci) {
-        FluxNetworksSyncer.onRemoveNetwork(network);
+        FluxNetworksSyncer.INSTANCE.removeNetwork(network);
     }
 }
