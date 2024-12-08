@@ -41,16 +41,13 @@ object FTBQuestSyncer {
                 when (document.operationType) {
                     OperationType.INSERT, OperationType.UPDATE, OperationType.REPLACE -> {
                         val fullDocument = document.fullDocument!!
-                        val data = fullDocument.data
-                        if (data != null) {
-                            val team = Universe.get().getTeam(fullDocument.id!!)
-                            val questData = ServerQuestData.get(team)
-                            questData.taskData.clear()
-                            questData.progressCache = null
-                            questData.areDependenciesCompleteCache = null
-
-                            (questData as ServerQuestDataAccessor).callReadData(data)
-                        }
+                        val data = fullDocument.data ?: return@onEach
+                        val team = Universe.get().getTeam(fullDocument.id!!) ?: return@onEach
+                        val questData = ServerQuestData.get(team)
+                        questData.taskData.clear()
+                        questData.progressCache = null
+                        questData.areDependenciesCompleteCache = null
+                        (questData as ServerQuestDataAccessor).callReadData(data)
                     }
 
                     else -> {}

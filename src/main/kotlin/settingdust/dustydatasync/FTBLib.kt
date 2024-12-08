@@ -2,6 +2,7 @@ package settingdust.dustydatasync
 
 import com.feed_the_beast.ftblib.events.player.ForgePlayerLoadedEvent
 import com.feed_the_beast.ftblib.events.player.ForgePlayerSavedEvent
+import com.feed_the_beast.ftblib.events.team.ForgeTeamDeletedEvent
 import com.feed_the_beast.ftblib.events.team.ForgeTeamLoadedEvent
 import com.feed_the_beast.ftblib.events.team.ForgeTeamSavedEvent
 import com.feed_the_beast.ftblib.lib.data.ForgePlayer
@@ -9,6 +10,7 @@ import com.feed_the_beast.ftblib.lib.data.ForgeTeam
 import com.feed_the_beast.ftblib.lib.data.TeamType
 import com.feed_the_beast.ftblib.lib.data.Universe
 import com.mongodb.client.model.Filters
+import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.UpdateOneModel
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
@@ -23,7 +25,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraftforge.fml.common.Mod
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 import org.bson.types.ObjectId
+import settingdust.dustydatasync.FTBLibSyncer.loadTeams
+import settingdust.dustydatasync.mixin.late.ftblib.ForgeTeamAccessor
+import settingdust.dustydatasync.mixin.late.ftblib.UniverseAccessor
 import java.util.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -67,11 +73,14 @@ data class SyncedFTBTeam(
 @OptIn(ExperimentalUuidApi::class)
 @Mod.EventBusSubscriber
 object FTBLibSyncer {
+    private var loading = false
+
     init {
         Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
             .watch()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
+                loading = true
                 when (document.operationType) {
                     OperationType.INSERT -> {
                         val fullDocument = document.fullDocument!!
@@ -95,6 +104,7 @@ object FTBLibSyncer {
 
                     else -> {}
                 }
+                loading = false
             }
             .launchIn(DustyDataSync.scope)
 
@@ -102,6 +112,7 @@ object FTBLibSyncer {
             .watch()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
+                loading = true
                 when (document.operationType) {
                     OperationType.INSERT -> {
                         val fullDocument = document.fullDocument!!
@@ -111,25 +122,33 @@ object FTBLibSyncer {
                             fullDocument.stringId!!,
                             fullDocument.type!!
                         )
-                        if (team.uid == 0.toShort()) team.markDirty()
                         Universe.get().addTeam(team)
                         if (team.type.save) {
                             team.deserializeNBT(fullDocument.data!!)
                             ForgeTeamLoadedEvent(team).post()
                         }
+                        if (team.uid == 0.toShort()) team.markDirty()
                     }
 
                     OperationType.UPDATE, OperationType.REPLACE -> {
                         val fullDocument = document.fullDocument ?: return@onEach
                         val team = Universe.get().getTeam(fullDocument.id!!)
-                        team.type = fullDocument.type
+                        (team as ForgeTeamAccessor).setType(fullDocument.type)
                         if (team.type.save) {
                             team.deserializeNBT(fullDocument.data!!)
                         }
+                        if (team.uid == 0.toShort()) team.markDirty()
+                    }
+
+                    OperationType.DELETE -> {
+                        val id = document.documentKey!!["_id"]!!.asInt32().value.toShort()
+                        val team = Universe.get().getTeam(id)
+                        Universe.get().removeTeam(team)
                     }
 
                     else -> {}
                 }
+                loading = false
             }
             .launchIn(DustyDataSync.scope)
     }
@@ -147,22 +166,28 @@ object FTBLibSyncer {
 
     @OptIn(ExperimentalUuidApi::class)
     fun Universe.loadPlayers(nbtMap: MutableMap<UUID, NBTTagCompound>) = runBlocking {
+        loading = true
         Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION).find().collect {
             val id = it.id!!.toJavaUuid()
-            players[id] = ForgePlayer(this@loadPlayers, id, it.name!!)
+            if (id !in players) {
+                players[id] = ForgePlayer(this@loadPlayers, id, it.name!!)
+            }
             nbtMap[id] = it.data!!
         }
+        loading = false
     }
 
     fun Universe.loadTeams(nbtMap: MutableMap<String, NBTTagCompound>) = runBlocking {
+        loading = true
         Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION).find()
             .collect {
                 val id = it.id!!
-                val team = ForgeTeam(this@loadTeams, generateTeamUID(id), it.stringId!!, it.type!!)
-                addTeam(team)
-                if (id == 0.toShort()) team.markDirty()
-                nbtMap[it.stringId] = it.data!!
+                if (id !in (this@loadTeams as UniverseAccessor).teamMap) {
+                    addTeam(ForgeTeam(this@loadTeams, id, it.stringId!!, it.type!!))
+                }
+                nbtMap[it.stringId!!] = it.data!!
             }
+        loading = false
     }
 
     fun Universe.saveUniverse(data: NBTTagCompound) = runBlocking {
@@ -202,6 +227,7 @@ object FTBLibSyncer {
     }
 
     fun ForgePlayer.savePlayer() = runBlocking {
+        if (loading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
         collection.updateOne(
             Filters.eq("_id", id.toKotlinUuid()),
@@ -240,6 +266,7 @@ object FTBLibSyncer {
     }
 
     fun ForgeTeam.saveTeam() = runBlocking {
+        if (loading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
         collection.updateOne(
             Filters.eq("_id", uid),
@@ -251,5 +278,21 @@ object FTBLibSyncer {
             UpdateOptions().upsert(true)
         )
         ForgeTeamSavedEvent(this@saveTeam).post()
+    }
+
+    fun ForgeTeam.addTeam() = runBlocking {
+        if (loading) return@runBlocking
+        val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
+        collection.replaceOne(
+            Filters.eq("_id", uid),
+            SyncedFTBTeam(uid, id, type, serializeNBT()),
+            ReplaceOptions().upsert(true)
+        )
+    }
+
+    fun ForgeTeam.removeTeam() = runBlocking {
+        if (loading) return@runBlocking
+        val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
+        collection.deleteOne(Filters.eq("_id", uid))
     }
 }

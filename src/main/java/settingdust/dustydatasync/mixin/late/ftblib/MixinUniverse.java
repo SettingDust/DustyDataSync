@@ -1,5 +1,6 @@
 package settingdust.dustydatasync.mixin.late.ftblib;
 
+import com.feed_the_beast.ftblib.lib.data.ForgeTeam;
 import com.feed_the_beast.ftblib.lib.data.Universe;
 import com.llamalad7.mixinextras.sugar.Local;
 import net.minecraft.nbt.NBTTagCompound;
@@ -32,11 +33,14 @@ public abstract class MixinUniverse {
         return FTBLibSyncer.INSTANCE.loadUniverse((Universe) (Object) this);
     }
 
-    @Redirect(method = "load", at = @At(value = "INVOKE", target = "Ljava/io/File;listFiles()[Ljava/io/File;"))
-    private File[] dustydatasync$cancelOriginalLoad(
-        final File instance
-    ) {
-        return null;
+    @Inject(method = "addTeam", at = @At("HEAD"))
+    private void dustydatasync$addTeam(final ForgeTeam team, final CallbackInfo ci) {
+        FTBLibSyncer.INSTANCE.addTeam(team);
+    }
+
+    @Inject(method = "removeTeam", at = @At("HEAD"))
+    private void dustydatasync$removeTeam(final ForgeTeam team, final CallbackInfo ci) {
+        FTBLibSyncer.INSTANCE.removeTeam(team);
     }
 
     @Inject(
