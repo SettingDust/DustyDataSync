@@ -8,7 +8,10 @@
         "fluxnetwork.MixinFluxNetworkBase",
         "fluxnetwork.MixinFluxNetworkData",
         "fluxnetwork.MixinFluxNetworkServer",
+        "ftblib.MixinForgePlayer",
+        "ftblib.MixinForgeTeam",
         "ftblib.MixinUniverse",
+        "ftblib.ServerQuestDataAccessor",
         "ftbquests.MixinForgePlayer",
         "ftbquests.MixinServerQuestData",
         "gamestages.MixinGameStageSaveHandler"

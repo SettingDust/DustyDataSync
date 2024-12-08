@@ -22,6 +22,7 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
+import net.minecraftforge.fml.common.Mod
 import org.bson.types.ObjectId
 import java.util.*
 import kotlin.uuid.ExperimentalUuidApi
@@ -64,6 +65,7 @@ data class SyncedFTBTeam(
 }
 
 @OptIn(ExperimentalUuidApi::class)
+@Mod.EventBusSubscriber
 object FTBLibSyncer {
     init {
         Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
@@ -145,12 +147,11 @@ object FTBLibSyncer {
 
     @OptIn(ExperimentalUuidApi::class)
     fun Universe.loadPlayers(nbtMap: MutableMap<UUID, NBTTagCompound>) = runBlocking {
-        Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION).find()
-            .collect {
-                val id = it.id!!.toJavaUuid()
-                players[id] = ForgePlayer(this@loadPlayers, id, it.name!!)
-                nbtMap[id] = it.data!!
-            }
+        Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION).find().collect {
+            val id = it.id!!.toJavaUuid()
+            players[id] = ForgePlayer(this@loadPlayers, id, it.name!!)
+            nbtMap[id] = it.data!!
+        }
     }
 
     fun Universe.loadTeams(nbtMap: MutableMap<String, NBTTagCompound>) = runBlocking {
@@ -168,51 +169,87 @@ object FTBLibSyncer {
         val collection = Database.database.getCollection<SyncedFTBUniverse>(SyncedFTBUniverse.COLLECTION)
         collection.updateOne(
             Filters.empty(),
-            Updates.set(SyncedFTBUniverse::data.name, data)
+            Updates.set(SyncedFTBUniverse::data.name, data),
+            UpdateOptions().upsert(true)
         )
     }
 
     @OptIn(ExperimentalUuidApi::class)
     fun Universe.savePlayers() = runBlocking {
+        if (players.isEmpty()) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
-        collection.bulkWrite(
-            players.values.map {
-                UpdateOneModel(
-                    Filters.eq("_id", it.id.toKotlinUuid()),
-                    Updates.combine(
-                        Updates.set(SyncedFTBPlayer::name.name, it.name),
-                        Updates.set(SyncedFTBPlayer::data.name, it.serializeNBT().also { compound ->
-                            compound.setString("TeamID", it.team.id)
-                        })
-                    ),
-                    UpdateOptions().upsert(true)
-                )
+        players.values.filter { it.needsSaving }.takeIf { it.isNotEmpty() }?.let {
+            collection.bulkWrite(
+                it.map {
+                    UpdateOneModel(
+                        Filters.eq("_id", it.id.toKotlinUuid()),
+                        Updates.combine(
+                            Updates.set(SyncedFTBPlayer::name.name, it.name),
+                            Updates.set(SyncedFTBPlayer::data.name, it.serializeNBT().also { compound ->
+                                compound.setString("TeamID", it.team.id)
+                            })
+                        ),
+                        UpdateOptions().upsert(true)
+                    )
+                }
+            )
+
+            for (player in it) {
+                ForgePlayerSavedEvent(player).post()
+                player.needsSaving = false
             }
-        )
-        for (player in players.values) {
-            ForgePlayerSavedEvent(player).post()
-            player.needsSaving = false
         }
+    }
+
+    fun ForgePlayer.savePlayer() = runBlocking {
+        val collection = Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
+        collection.updateOne(
+            Filters.eq("_id", id.toKotlinUuid()),
+            Updates.combine(
+                Updates.set(SyncedFTBPlayer::name.name, name),
+                Updates.set(SyncedFTBPlayer::data.name, serializeNBT().also { compound ->
+                    compound.setString("TeamID", team.id)
+                })
+            )
+        )
+        ForgePlayerSavedEvent(this@savePlayer).post()
     }
 
     fun Universe.saveTeams() = runBlocking {
         val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
-        collection.bulkWrite(
-            teams.filter { team -> team.type.save }.map {
-                UpdateOneModel(
-                    Filters.eq("_id", it.uid),
-                    Updates.combine(
-                        Updates.set("_id", it.uid),
-                        Updates.set(SyncedFTBTeam::stringId.name, it.id),
-                        Updates.set(SyncedFTBTeam::type.name, it.type),
-                        Updates.set(SyncedFTBTeam::data.name, it.serializeNBT())
+        teams.filter { team -> team.type.save }.takeIf { it.isNotEmpty() }?.let { teams ->
+            collection.bulkWrite(
+                teams.map {
+                    UpdateOneModel(
+                        Filters.eq("_id", it.uid),
+                        Updates.combine(
+                            Updates.set(SyncedFTBTeam::stringId.name, it.id),
+                            Updates.set(SyncedFTBTeam::type.name, it.type),
+                            Updates.set(SyncedFTBTeam::data.name, it.serializeNBT())
+                        ),
+                        UpdateOptions().upsert(true)
                     )
-                )
-            }
-        )
+                }
+            )
+        }
+
         for (team in teams) {
             ForgeTeamSavedEvent(team).post()
             team.needsSaving = false
         }
+    }
+
+    fun ForgeTeam.saveTeam() = runBlocking {
+        val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
+        collection.updateOne(
+            Filters.eq("_id", uid),
+            Updates.combine(
+                Updates.set(SyncedFTBTeam::stringId.name, id),
+                Updates.set(SyncedFTBTeam::type.name, type),
+                Updates.set(SyncedFTBTeam::data.name, serializeNBT())
+            ),
+            UpdateOptions().upsert(true)
+        )
+        ForgeTeamSavedEvent(this@saveTeam).post()
     }
 }

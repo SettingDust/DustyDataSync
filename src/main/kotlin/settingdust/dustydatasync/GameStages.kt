@@ -2,6 +2,7 @@ package settingdust.dustydatasync
 
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Projections
+import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.single
@@ -52,6 +53,10 @@ object GameStagesSyncer {
     fun savePlayerData(id: String, data: NBTTagCompound) = DustyDataSync.scope.launch {
         val stageCollection = Database.database.getCollection<SyncedGameStage>(SyncedGameStage.COLLECTION)
         val uuid = Uuid.parse(id)
-        stageCollection.updateOne(Filters.eq("_id", uuid), Updates.set(SyncedGameStage::data.name, data))
+        stageCollection.updateOne(
+            Filters.eq("_id", uuid),
+            Updates.set(SyncedGameStage::data.name, data),
+            UpdateOptions().upsert(true)
+        )
     }
 }

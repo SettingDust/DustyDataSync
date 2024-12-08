@@ -30,13 +30,13 @@ object DustyDataSync {
     lateinit var serverCoroutineDispatcher: CoroutineDispatcher
 
     val hasFTB = Loader.isModLoaded("ftblib")
+    val hasFTBQuests = Loader.isModLoaded("ftbquests")
     val hasGameStages = Loader.isModLoaded("gamestages")
     val hasFluxNetworks = Loader.isModLoaded("fluxnetworks")
 
     @Mod.EventHandler
     fun preInit(event: FMLServerAboutToStartEvent) {
         MinecraftForge.EVENT_BUS.register(this)
-        requireNotNull(PlayerLocalLocker)
         serverCoroutineDispatcher =
             MinecraftServerExecutor(event.server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)

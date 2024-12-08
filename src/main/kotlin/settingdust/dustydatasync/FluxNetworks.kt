@@ -1,8 +1,8 @@
 package settingdust.dustydatasync
 
 import com.mongodb.client.model.Filters
-import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.UpdateOneModel
+import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.client.model.changestream.FullDocument
 import com.mongodb.client.model.changestream.OperationType
@@ -73,7 +73,7 @@ object FluxNetworksSyncer {
         .onEach { updates.emit(this) }
         .launchIn(DustyDataSync.serverCoroutineScope)
 
-    var syncing = false
+    var loading = false
 
     fun <T> FluxNetworkBase.emitUpdate(value: ObservableCustomValue<T>) = runBlocking {
         value.updates.emit(value.value to value.value)
@@ -88,7 +88,8 @@ object FluxNetworksSyncer {
                     networks.map { network ->
                         UpdateOneModel(
                             Filters.eq("_id", network.networkID),
-                            Updates.set(SyncedFluxNetwork::data.name, network)
+                            Updates.set(SyncedFluxNetwork::data.name, network.toNbt()),
+                            UpdateOptions().upsert(true)
                         )
                     }
                 )
@@ -97,7 +98,7 @@ object FluxNetworksSyncer {
         collection.watch()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
-                syncing = true
+                loading = true
                 when (document.operationType) {
                     OperationType.INSERT -> {
                         FluxNetworkData.get().addNetwork(FluxNetworkServer().also {
@@ -134,22 +135,35 @@ object FluxNetworksSyncer {
 
                     else -> {}
                 }
-                syncing = false
+                loading = false
             }
             .launchIn(DustyDataSync.scope)
     }
 
-    fun addNetwork(network: IFluxNetwork) = runBlocking {
-        if (syncing) return@runBlocking
+    fun FluxNetworkData.loadNetworks() = runBlocking {
         val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
-        collection.replaceOne(
-            Filters.eq("_id", network.networkID), SyncedFluxNetwork(network.networkID, network.toNbt()),
-            ReplaceOptions().upsert(true)
+        loading = true
+        collection.find().collect { synced ->
+            val network = networks.getOrDefault(synced.id!!, FluxNetworkServer())
+            network.readNetworkNBT(synced.data, NBTType.NETWORK_GENERAL)
+            network.readNetworkNBT(synced.data, NBTType.NETWORK_PLAYERS)
+            addNetwork(network)
+        }
+        loading = false
+    }
+
+    fun addNetwork(network: IFluxNetwork) = runBlocking {
+        if (loading) return@runBlocking
+        val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
+        collection.updateOne(
+            Filters.eq("_id", network.networkID),
+            Updates.set(SyncedFluxNetwork::data.name, network.toNbt()),
+            UpdateOptions().upsert(true)
         )
     }
 
     fun removeNetwork(network: IFluxNetwork) = runBlocking {
-        if (syncing) return@runBlocking
+        if (loading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
         collection.deleteOne(Filters.eq("_id", network.networkID))
     }

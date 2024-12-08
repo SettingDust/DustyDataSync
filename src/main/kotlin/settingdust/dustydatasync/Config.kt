@@ -56,6 +56,10 @@ data object Database {
                 add(KotlinSerializerCodec.create<SyncedFTBUniverse>(serializerModule, bsonConfiguration))
                 add(KotlinSerializerCodec.create<SyncedFTBPlayer>(serializerModule, bsonConfiguration))
                 add(KotlinSerializerCodec.create<SyncedFTBTeam>(serializerModule, bsonConfiguration))
+                add(KotlinSerializerCodec.create<SyncedFTBQuest>(serializerModule, bsonConfiguration))
+            }
+            if (DustyDataSync.hasFTBQuests) {
+                add(KotlinSerializerCodec.create<SyncedFTBQuest>(serializerModule, bsonConfiguration))
             }
             if (DustyDataSync.hasFluxNetworks) {
                 add(KotlinSerializerCodec.create<SyncedFluxNetwork>(serializerModule, bsonConfiguration))
@@ -117,5 +121,7 @@ data object Database {
         }
 
         runCatching { database.createCollection(SyncedFTBUniverse.COLLECTION) }
+
+        runCatching { database.createCollection(SyncedFTBQuest.COLLECTION) }
     }
 }

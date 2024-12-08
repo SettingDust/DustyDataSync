@@ -45,7 +45,6 @@ import net.minecraft.nbt.NBTTagString
 import settingdust.dustydatasync.mixin.early.serialization.NBTTagCompoundAccessor
 import settingdust.dustydatasync.mixin.early.serialization.NBTTagEndAccessor
 import settingdust.dustydatasync.mixin.early.serialization.NBTTagLongArrayAccessor
-import settingdust.dustydatasync.serialization.SealedClassSerializer
 import settingdust.dustydatasync.serialization.tag.MinecraftTagDecoder
 import settingdust.dustydatasync.serialization.tag.MinecraftTagEncoder
 
@@ -75,6 +74,7 @@ private val BYTE = Regex("""([-+]?(?:0|[1-9]\d*))b""", RegexOption.IGNORE_CASE)
 private val LONG = Regex("""([-+]?(?:0|[1-9]\d*))l""", RegexOption.IGNORE_CASE)
 private val SHORT = Regex("""([-+]?(?:0|[1-9]\d*))s""", RegexOption.IGNORE_CASE)
 private val INT = Regex("""([-+]?(?:0|[1-9]\d*))""")
+private val STRING = Regex(""""(.*?)"""")
 
 @OptIn(ExperimentalSerializationApi::class)
 class NbtPolymorphicSerializer(discriminator: String) : SealedClassSerializer<NBTBase>(
@@ -287,10 +287,15 @@ object NBTTagEndSerializer : KSerializer<NBTTagEnd> {
 object NBTTagStringSerializer : KSerializer<NBTTagString> {
     override val descriptor = PrimitiveSerialDescriptor("n_stri", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder) = NBTTagString(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): NBTTagString {
+        val input = decoder.decodeString()
+        val result = STRING.find(input)
+        return if (result != null) NBTTagString(result.groupValues[1])
+        else NBTTagString(input)
+    }
 
     override fun serialize(encoder: Encoder, value: NBTTagString) =
-        encoder.encodeString(value.string)
+        encoder.encodeString("\"${value.string}\"")
 }
 
 /** NumericTag */
