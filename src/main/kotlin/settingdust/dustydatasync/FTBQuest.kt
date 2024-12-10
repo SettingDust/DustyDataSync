@@ -2,6 +2,8 @@ package settingdust.dustydatasync
 
 import com.feed_the_beast.ftblib.lib.data.ForgeTeam
 import com.feed_the_beast.ftblib.lib.data.Universe
+import com.feed_the_beast.ftbquests.quest.QuestObjectBase
+import com.feed_the_beast.ftbquests.quest.ServerQuestFile
 import com.feed_the_beast.ftbquests.util.ServerQuestData
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.UpdateOptions
@@ -19,7 +21,9 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
+import org.apache.logging.log4j.LogManager
 import settingdust.dustydatasync.mixin.late.ftblib.ServerQuestDataAccessor
+import java.util.function.Supplier
 
 @Serializable
 data class SyncedFTBQuest(
@@ -32,46 +36,79 @@ data class SyncedFTBQuest(
 }
 
 object FTBQuestSyncer {
+    private val logger = LogManager.getLogger()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION).watch<SyncedFTBQuest>()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
+                FTBLibSyncer.loading = true
                 when (document.operationType) {
                     OperationType.INSERT, OperationType.UPDATE, OperationType.REPLACE -> {
                         val fullDocument = document.fullDocument!!
                         val data = fullDocument.data ?: return@onEach
-                        val team = Universe.get().getTeam(fullDocument.id!!) ?: return@onEach
-                        val questData = ServerQuestData.get(team)
-                        questData.taskData.clear()
-                        questData.progressCache = null
-                        questData.areDependenciesCompleteCache = null
-                        (questData as ServerQuestDataAccessor).callReadData(data)
+                        runBlocking(DustyDataSync.serverCoroutineDispatcher) {
+                            val team = Universe.get().getTeam(fullDocument.id!!) ?: return@runBlocking
+                            val questData = ServerQuestData.get(team)
+                            questData.taskData.entries
+                                .filter { (key, value) -> !data.hasKey(QuestObjectBase.getCodeString(key)) }
+                                .forEach { (_, value) -> questData.createTaskData(value.task) }
+                            for (key in data.keySet) {
+                                val id = ServerQuestFile.INSTANCE.getID(key)
+                                if (id in questData.taskData) continue
+                                val task = ServerQuestFile.INSTANCE.getTask(id)
+                                if (task == null) {
+                                    logger.warn("Failed to find task with id {}", id)
+                                    continue
+                                }
+                                questData.createTaskData(task)
+                            }
+                            questData.progressCache = null
+                            questData.areDependenciesCompleteCache = null
+                            (questData as ServerQuestDataAccessor).callReadData(data)
+                            logger.debug("Synced update quest data for team {}. Data: {}", team.uid, data)
+                        }
                     }
 
                     else -> {}
                 }
+                FTBLibSyncer.loading = false
             }.launchIn(scope)
     }
 
-    fun ForgeTeam.load() = runBlocking {
+    fun ForgeTeam.load(original: Supplier<NBTTagCompound?>): NBTTagCompound? {
+        FTBLibSyncer.loading = true
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
-        return@runBlocking try {
-            collection.find(Filters.eq("_id", uid)).single().data
-        } catch (e: NoSuchElementException) {
+        val data = try {
+            runBlocking { collection.find(Filters.eq("_id", uid)).single() }.data
+        } catch (_: NoSuchElementException) {
             null
         } catch (e: Exception) {
+            FTBLibSyncer.loading = false
             throw e
+        }.also {
+            logger.debug("Loaded quest data for team {}. Data: {}", uid, it)
+            FTBLibSyncer.loading = false
         }
+        return if (data == null || data.isEmpty) original.get() else data
     }
 
     fun ForgeTeam.save(nbt: NBTTagCompound) = runBlocking {
+        if (FTBLibSyncer.loading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
         collection.updateOne(
             Filters.eq("_id", uid),
             Updates.set(SyncedFTBQuest::data.name, nbt),
             UpdateOptions().upsert(true)
         )
+        logger.debug("Saved quest data for team {}. Data: {}", uid, nbt)
+    }
+
+    fun remove(team: ForgeTeam) = runBlocking {
+        if (FTBLibSyncer.loading) return@runBlocking
+        val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
+        collection.deleteOne(Filters.eq("_id", team.uid))
+        logger.debug("Removed quest data for team {}", team.uid)
     }
 }

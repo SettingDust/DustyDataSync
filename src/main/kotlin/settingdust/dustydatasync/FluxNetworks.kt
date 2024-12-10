@@ -144,6 +144,7 @@ object FluxNetworksSyncer {
         val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
         loading = true
         collection.find().collect { synced ->
+            if (synced.data == null || synced.data.isEmpty) return@collect
             val network = networks.getOrDefault(synced.id!!, FluxNetworkServer())
             network.readNetworkNBT(synced.data, NBTType.NETWORK_GENERAL)
             network.readNetworkNBT(synced.data, NBTType.NETWORK_PLAYERS)

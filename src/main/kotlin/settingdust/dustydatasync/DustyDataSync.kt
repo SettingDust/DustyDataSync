@@ -15,6 +15,9 @@ import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.common.event.FMLInitializationEvent
 import net.minecraftforge.fml.common.event.FMLServerAboutToStartEvent
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
+import org.apache.logging.log4j.Level
+import org.apache.logging.log4j.core.config.Configurator
+import java.util.logging.Logger
 
 @Mod(
     modid = Tags.ID,
@@ -40,6 +43,9 @@ object DustyDataSync {
         serverCoroutineDispatcher =
             MinecraftServerExecutor(event.server).asCoroutineDispatcher()
         serverCoroutineScope = CoroutineScope(SupervisorJob() + serverCoroutineDispatcher)
+
+        Configurator.setLevel("org.mongodb.driver", Level.INFO)
+        Logger.getLogger("org.mongodb.driver").setLevel(java.util.logging.Level.INFO);
     }
 
     @Mod.EventHandler

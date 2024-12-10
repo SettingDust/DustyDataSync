@@ -13,6 +13,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
 import org.apache.logging.log4j.LogManager
+import java.util.function.Supplier
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -32,7 +33,7 @@ object GameStagesSyncer {
     private val logger = LogManager.getLogger()
 
     @OptIn(ExperimentalUuidApi::class, FlowPreview::class)
-    fun getPlayerData(id: String) = runBlocking {
+    fun getPlayerData(id: String, original: Supplier<NBTTagCompound?>) = runBlocking {
         val stageCollection = Database.database.getCollection<SyncedGameStage>(SyncedGameStage.COLLECTION)
         logger.debug("Getting player data for {}", id)
         val uuid = Uuid.parse(id)
@@ -40,13 +41,13 @@ object GameStagesSyncer {
             stageCollection.find(Filters.eq("_id", uuid))
                 .projection(Projections.include(SyncedGameStage::data.name)).single().data
         } catch (_: NoSuchElementException) {
-            NBTTagCompound()
+            null
         } catch (e: Throwable) {
             throw IllegalStateException("Failed to find data for player $id", e)
-        }!!
+        }
         logger.debug("Player {} stages: {}", uuid, stages)
 
-        return@runBlocking stages
+        return@runBlocking if (stages == null || stages.isEmpty) original.get() else stages
     }
 
     @OptIn(ExperimentalUuidApi::class)
