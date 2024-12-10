@@ -8,6 +8,7 @@
         "fluxnetwork.MixinFluxNetworkBase",
         "fluxnetwork.MixinFluxNetworkData",
         "fluxnetwork.MixinFluxNetworkServer",
+        "fluxnetwork.MixinPacketGeneralHandler",
         "ftblib.ForgeTeamAccessor",
         "ftblib.MixinForgePlayer",
         "ftblib.MixinForgeTeam",

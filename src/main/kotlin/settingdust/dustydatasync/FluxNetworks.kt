@@ -1,6 +1,7 @@
 package settingdust.dustydatasync
 
 import com.mongodb.client.model.Filters
+import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.UpdateOneModel
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
@@ -22,6 +23,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
 import sonar.fluxnetworks.api.network.IFluxNetwork
+import sonar.fluxnetworks.api.network.NetworkMember
 import sonar.fluxnetworks.api.utils.ICustomValue
 import sonar.fluxnetworks.api.utils.NBTType
 import sonar.fluxnetworks.common.connection.FluxNetworkBase
