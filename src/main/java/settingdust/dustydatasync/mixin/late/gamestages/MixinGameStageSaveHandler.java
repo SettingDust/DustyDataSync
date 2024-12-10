@@ -1,5 +1,7 @@
 package settingdust.dustydatasync.mixin.late.gamestages;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import net.darkhax.gamestages.data.GameStageSaveHandler;
 import net.minecraft.nbt.NBTTagCompound;
@@ -15,15 +17,15 @@ import java.io.File;
 @Mixin(value = GameStageSaveHandler.class)
 public abstract class MixinGameStageSaveHandler {
 
-    @Redirect(
+    @WrapOperation(
         method = "onPlayerLoad",
         at = @At(
             value = "INVOKE",
             target = "Lnet/minecraft/nbt/CompressedStreamTools;read(Ljava/io/File;)Lnet/minecraft/nbt/NBTTagCompound;"
         )
     )
-    private static NBTTagCompound dustydatasync$loadFromDatabase(final File file, PlayerEvent.LoadFromFile event) {
-        return GameStagesSyncer.INSTANCE.getPlayerData(event.getPlayerUUID());
+    private static NBTTagCompound dustydatasync$loadFromDatabase(final File file, Operation<NBTTagCompound> original, PlayerEvent.LoadFromFile event) {
+        return GameStagesSyncer.INSTANCE.getPlayerData(event.getPlayerUUID(), () -> original.call(file));
     }
 
     @ModifyArg(
