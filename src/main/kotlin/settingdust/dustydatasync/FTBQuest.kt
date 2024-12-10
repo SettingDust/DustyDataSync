@@ -23,6 +23,7 @@ import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
 import org.apache.logging.log4j.LogManager
 import settingdust.dustydatasync.mixin.late.ftblib.ServerQuestDataAccessor
+import java.util.*
 import java.util.function.Supplier
 
 @Serializable
@@ -38,12 +39,13 @@ data class SyncedFTBQuest(
 object FTBQuestSyncer {
     private val logger = LogManager.getLogger()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    var questLoading = false
 
     init {
         Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION).watch<SyncedFTBQuest>()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
-                FTBLibSyncer.loading = true
+                questLoading = true
                 when (document.operationType) {
                     OperationType.INSERT, OperationType.UPDATE, OperationType.REPLACE -> {
                         val fullDocument = document.fullDocument!!
@@ -73,29 +75,29 @@ object FTBQuestSyncer {
 
                     else -> {}
                 }
-                FTBLibSyncer.loading = false
+                questLoading = false
             }.launchIn(scope)
     }
 
     fun ForgeTeam.load(original: Supplier<NBTTagCompound?>): NBTTagCompound? {
-        FTBLibSyncer.loading = true
+        questLoading = true
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
         val data = try {
             runBlocking { collection.find(Filters.eq("_id", uid)).single() }.data
         } catch (_: NoSuchElementException) {
             null
         } catch (e: Exception) {
-            FTBLibSyncer.loading = false
+            questLoading = false
             throw e
         }.also {
             logger.debug("Loaded quest data for team {}. Data: {}", uid, it)
-            FTBLibSyncer.loading = false
+            questLoading = false
         }
         return if (data == null || data.isEmpty) original.get() else data
     }
 
     fun ForgeTeam.save(nbt: NBTTagCompound) = runBlocking {
-        if (FTBLibSyncer.loading) return@runBlocking
+        if (questLoading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
         collection.updateOne(
             Filters.eq("_id", uid),
@@ -106,7 +108,7 @@ object FTBQuestSyncer {
     }
 
     fun remove(team: ForgeTeam) = runBlocking {
-        if (FTBLibSyncer.loading) return@runBlocking
+        if (questLoading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
         collection.deleteOne(Filters.eq("_id", team.uid))
         logger.debug("Removed quest data for team {}", team.uid)

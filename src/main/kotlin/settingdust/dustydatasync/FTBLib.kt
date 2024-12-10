@@ -73,14 +73,15 @@ data class SyncedFTBTeam(
 @Mod.EventBusSubscriber
 object FTBLibSyncer {
     private val logger = LogManager.getLogger()
-    var loading = false
+    var playerLoading = false
+    var teamLoading = false
 
     init {
         Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
             .watch()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
-                loading = true
+                playerLoading = true
                 when (document.operationType) {
                     OperationType.INSERT -> {
                         val fullDocument = document.fullDocument!!
@@ -89,11 +90,11 @@ object FTBLibSyncer {
                             fullDocument.id!!.toJavaUuid(),
                             fullDocument.name!!
                         )
+                        player.deserializeNBT(fullDocument.data!!)
+                        player.team = Universe.get().getTeam(fullDocument.data.getString("TeamID"))
+                        ForgePlayerLoadedEvent(player).post()
                         runBlocking(DustyDataSync.serverCoroutineDispatcher) {
                             Universe.get().players[player.id] = player
-                            player.deserializeNBT(fullDocument.data!!)
-                            player.team = Universe.get().getTeam(fullDocument.data.getString("TeamID"))
-                            ForgePlayerLoadedEvent(player).post()
                         }
                         logger.debug(
                             "Synced adding player {} with id {}. Data: {}",
@@ -120,7 +121,7 @@ object FTBLibSyncer {
 
                     else -> {}
                 }
-                loading = false
+                playerLoading = false
             }
             .launchIn(DustyDataSync.scope)
 
@@ -129,7 +130,7 @@ object FTBLibSyncer {
                 .watch()
                 .fullDocument(FullDocument.UPDATE_LOOKUP)
                 .collect { document ->
-                    loading = true
+                    teamLoading = true
                     when (document.operationType) {
                         OperationType.INSERT -> {
                             val fullDocument = document.fullDocument!!
@@ -186,7 +187,7 @@ object FTBLibSyncer {
 
                         else -> {}
                     }
-                    loading = false
+                    teamLoading = false
                 }
         }
     }
@@ -204,7 +205,7 @@ object FTBLibSyncer {
 
     @OptIn(ExperimentalUuidApi::class)
     fun Universe.loadPlayers(nbtMap: MutableMap<UUID, NBTTagCompound>) = runBlocking {
-        loading = true
+        playerLoading = true
         Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION).find().collect {
             val id = it.id!!.toJavaUuid()
             if (id !in players) {
@@ -215,11 +216,11 @@ object FTBLibSyncer {
                 logger.debug("Bulk loaded player {} with id {}. Data: {}", it.name, it.id, it.data)
             }
         }
-        loading = false
+        playerLoading = false
     }
 
     fun Universe.loadTeams(nbtMap: MutableMap<String, NBTTagCompound>) = runBlocking {
-        loading = true
+        teamLoading = true
         Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION).find()
             .collect {
                 val id = it.id!!
@@ -231,7 +232,7 @@ object FTBLibSyncer {
                     logger.debug("Bulk loaded team {} with id {}. Data: {}", it.stringId, it.id, it.data)
                 }
             }
-        loading = false
+        teamLoading = false
     }
 
     fun Universe.saveUniverse(data: NBTTagCompound) = runBlocking {
@@ -275,7 +276,7 @@ object FTBLibSyncer {
     }
 
     fun ForgePlayer.savePlayer() = runBlocking {
-        if (loading) return@runBlocking
+        if (playerLoading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBPlayer>(SyncedFTBPlayer.COLLECTION)
         val data = serializeNBT().also { compound -> compound.setString("TeamID", team.id) }
         collection.updateOne(
@@ -318,7 +319,7 @@ object FTBLibSyncer {
     }
 
     fun ForgeTeam.saveTeam() = runBlocking {
-        if (loading || !isValid || !type.save || uid !in (universe as UniverseAccessor).teamMap) return@runBlocking
+        if (teamLoading || !isValid || !type.save || uid !in (universe as UniverseAccessor).teamMap) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
         val data = serializeNBT()
         collection.updateOne(
@@ -335,7 +336,7 @@ object FTBLibSyncer {
     }
 
     fun ForgeTeam.addTeam() = runBlocking {
-        if (loading) return@runBlocking
+        if (teamLoading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
         val data = serializeNBT()
         collection.replaceOne(
@@ -347,7 +348,7 @@ object FTBLibSyncer {
     }
 
     fun ForgeTeam.removeTeam() = runBlocking {
-        if (loading) return@runBlocking
+        if (teamLoading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBTeam>(SyncedFTBTeam.COLLECTION)
         collection.deleteOne(Filters.eq("_id", uid))
         logger.debug("Removed team {} with id {}", id, uid)
