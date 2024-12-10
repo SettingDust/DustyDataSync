@@ -190,31 +190,12 @@ object NBTTagCompoundSerializer : KSerializer<NBTTagCompound> {
         NBTTagCompound().apply {
             MapSerializer(String.serializer(), decoder.serializersModule.serializer<NBTBase>())
                 .deserialize(decoder)
-                .forEach {
-                    setTag(it.key, it.value)
-                }
+                .forEach { setTag(it.key, it.value) }
         }
 
     override fun serialize(encoder: Encoder, value: NBTTagCompound) {
-        val map = (value as NBTTagCompoundAccessor).tagMap.filterValues {
-            when (it) {
-                is NBTTagByte -> it.byte != 0.toByte()
-                is NBTTagShort -> it.short != 0.toShort()
-                is NBTTagInt -> it.int != 0
-                is NBTTagLong -> it.long != 0L
-                is NBTTagFloat -> it.float != 0.0f
-                is NBTTagDouble -> it.double != 0.0
-                is NBTTagString -> it.string.isNotEmpty()
-                is NBTTagList -> !it.isEmpty
-                is NBTTagByteArray -> it.byteArray.isNotEmpty()
-                is NBTTagIntArray -> it.intArray.isNotEmpty()
-                is NBTTagLongArray -> (it as NBTTagLongArrayAccessor).data.isNotEmpty()
-                is NBTTagCompound -> !it.isEmpty
-                else -> true
-            }
-        }
         MapSerializer(String.serializer(), encoder.serializersModule.serializer<NBTBase>())
-            .serialize(encoder, map)
+            .serialize(encoder, (value as NBTTagCompoundAccessor).tagMap)
     }
 }
 
