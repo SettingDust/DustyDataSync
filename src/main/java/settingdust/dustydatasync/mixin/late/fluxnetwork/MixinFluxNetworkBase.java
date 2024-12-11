@@ -29,7 +29,7 @@ public class MixinFluxNetworkBase {
     @Shadow public ICustomValue<NetworkStatistics> network_stats;
     @Shadow public ICustomValue<List<NetworkMember>> network_players;
 
-    @Inject(method = "<init>()V", at = @At("TAIL"))
+    @Inject(method = "<init>*", at = @At("TAIL"))
     private void dustydatasync$init(CallbackInfo ci) {
         network_name = new ObservableCustomValue<>(network_name);
         network_owner = new ObservableCustomValue<>(network_owner);

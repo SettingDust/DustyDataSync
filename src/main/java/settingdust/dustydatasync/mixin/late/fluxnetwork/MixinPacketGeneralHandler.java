@@ -24,7 +24,6 @@ public class MixinPacketGeneralHandler {
         remap = false,
         at = @At(
             value = "INVOKE",
-            ordinal = 1,
             target = "Lsonar/fluxnetworks/common/network/PacketNetworkUpdate$NetworkUpdateMessage;<init>(Ljava/util/List;Lsonar/fluxnetworks/api/utils/NBTType;)V"
         )
     )

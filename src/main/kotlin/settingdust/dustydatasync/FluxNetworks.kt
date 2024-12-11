@@ -1,7 +1,6 @@
 package settingdust.dustydatasync
 
 import com.mongodb.client.model.Filters
-import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.UpdateOneModel
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
@@ -17,13 +16,14 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.NBTTagCompound
 import sonar.fluxnetworks.api.network.IFluxNetwork
-import sonar.fluxnetworks.api.network.NetworkMember
+import sonar.fluxnetworks.api.network.NetworkSettings
 import sonar.fluxnetworks.api.utils.ICustomValue
 import sonar.fluxnetworks.api.utils.NBTType
 import sonar.fluxnetworks.common.connection.FluxNetworkBase
@@ -59,21 +59,23 @@ object FluxNetworksSyncer {
     val updates = MutableSharedFlow<IFluxNetwork>()
 
     @OptIn(FlowPreview::class)
-    fun FluxNetworkBase.observeValues() = merge(
-        (network_name as ObservableCustomValue<*>).updates,
-        (network_owner as ObservableCustomValue<*>).updates,
-        (network_security as ObservableCustomValue<*>).updates,
-        (network_password as ObservableCustomValue<*>).updates,
-        (network_color as ObservableCustomValue<*>).updates,
-        (network_energy as ObservableCustomValue<*>).updates,
-        (network_wireless as ObservableCustomValue<*>).updates,
-        (network_stats as ObservableCustomValue<*>).updates,
-        (network_players as ObservableCustomValue<*>).updates
-    )
-        .flowOn(Dispatchers.IO)
-        .debounce(50.milliseconds)
-        .onEach { updates.emit(this) }
-        .launchIn(DustyDataSync.serverCoroutineScope)
+    fun FluxNetworkBase.observeValues() = if (DustyDataSync.isServerScopeInitialized()) {
+        merge(
+            (network_name as ObservableCustomValue<*>).updates,
+            (network_owner as ObservableCustomValue<*>).updates,
+            (network_security as ObservableCustomValue<*>).updates,
+            (network_password as ObservableCustomValue<*>).updates,
+            (network_color as ObservableCustomValue<*>).updates,
+            (network_energy as ObservableCustomValue<*>).updates,
+            (network_wireless as ObservableCustomValue<*>).updates,
+            (network_stats as ObservableCustomValue<*>).updates,
+            (network_players as ObservableCustomValue<*>).updates
+        )
+            .flowOn(Dispatchers.IO)
+            .debounce(50.milliseconds)
+            .onEach { updates.emit(this) }
+            .launchIn(DustyDataSync.serverCoroutineScope)
+    } else Unit
 
     var loading = false
 
@@ -113,6 +115,7 @@ object FluxNetworksSyncer {
                         val id = document.documentKey!!.getInt32("_id").value
                         val network = FluxNetworkCache.instance.getNetwork(id)
                         if (document.fullDocument == null) return@onEach
+                        network.getSetting(NetworkSettings.NETWORK_PLAYERS).clear()
                         network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_GENERAL)
                         network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_PLAYERS)
                     }
@@ -120,13 +123,18 @@ object FluxNetworksSyncer {
                     OperationType.REPLACE -> {
                         val id = document.documentKey!!.getInt32("_id").value
                         val network = FluxNetworkCache.instance.getNetwork(id)
+                        network.getSetting(NetworkSettings.NETWORK_PLAYERS).clear()
                         network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_GENERAL)
                         network.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_PLAYERS)
                     }
 
                     OperationType.DELETE -> {
                         val id = document.documentKey!!.getInt32("_id").value
-                        FluxNetworkData.get().removeNetwork(FluxNetworkCache.instance.getNetwork(id))
+                        DustyDataSync.serverCoroutineScope.launch {
+                            if (id in FluxNetworkData.get().networks) {
+                                FluxNetworkData.get().removeNetwork(FluxNetworkCache.instance.getNetwork(id))
+                            }
+                        }
                     }
 
                     OperationType.DROP -> {

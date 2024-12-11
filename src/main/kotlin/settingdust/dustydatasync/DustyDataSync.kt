@@ -32,10 +32,16 @@ object DustyDataSync {
     lateinit var serverCoroutineScope: CoroutineScope
     lateinit var serverCoroutineDispatcher: CoroutineDispatcher
 
+
     val hasFTB = Loader.isModLoaded("ftblib")
     val hasFTBQuests = Loader.isModLoaded("ftbquests")
     val hasGameStages = Loader.isModLoaded("gamestages")
     val hasFluxNetworks = Loader.isModLoaded("fluxnetworks")
+
+    init {
+        ConfigManager.sync(Tags.ID, Config.Type.INSTANCE)
+        runBlocking { Database.reload() }
+    }
 
     @Mod.EventHandler
     fun preInit(event: FMLServerAboutToStartEvent) {
@@ -48,11 +54,7 @@ object DustyDataSync {
         Logger.getLogger("org.mongodb.driver").setLevel(java.util.logging.Level.INFO);
     }
 
-    @Mod.EventHandler
-    fun init(event: FMLInitializationEvent) {
-        ConfigManager.sync(Tags.ID, Config.Type.INSTANCE)
-        runBlocking { Database.reload() }
-    }
+    fun isServerScopeInitialized() = ::serverCoroutineScope.isInitialized
 
     @SubscribeEvent
     fun onConfigChangedEvent(event: OnConfigChangedEvent) {
