@@ -17,6 +17,7 @@
         "ftblib.UniverseAccessor",
         "ftbquests.MixinForgePlayer",
         "ftbquests.MixinServerQuestData",
+        "ftbquests.MixinServerQuestFile",
         "gamestages.MixinGameStageSaveHandler"
     ],
     "client": [

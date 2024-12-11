@@ -40,11 +40,13 @@ object FTBQuestSyncer {
     private val logger = LogManager.getLogger()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     var questLoading = false
+    var questUnloading = false
 
     init {
         Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION).watch<SyncedFTBQuest>()
             .fullDocument(FullDocument.UPDATE_LOOKUP)
             .onEach { document ->
+                if (questUnloading) return@onEach
                 questLoading = true
                 when (document.operationType) {
                     OperationType.INSERT, OperationType.UPDATE, OperationType.REPLACE -> {
@@ -97,7 +99,7 @@ object FTBQuestSyncer {
     }
 
     fun ForgeTeam.save(nbt: NBTTagCompound) = runBlocking {
-        if (questLoading) return@runBlocking
+        if (questLoading || questUnloading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
         collection.updateOne(
             Filters.eq("_id", uid),
@@ -108,7 +110,7 @@ object FTBQuestSyncer {
     }
 
     fun remove(team: ForgeTeam) = runBlocking {
-        if (questLoading) return@runBlocking
+        if (questLoading || questUnloading) return@runBlocking
         val collection = Database.database.getCollection<SyncedFTBQuest>(SyncedFTBQuest.COLLECTION)
         collection.deleteOne(Filters.eq("_id", team.uid))
         logger.debug("Removed quest data for team {}", team.uid)
