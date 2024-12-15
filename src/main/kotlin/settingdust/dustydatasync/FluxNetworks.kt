@@ -105,10 +105,14 @@ object FluxNetworksSyncer {
                 loading = true
                 when (document.operationType) {
                     OperationType.INSERT -> {
-                        FluxNetworkData.get().addNetwork(FluxNetworkServer().also {
+                        val network = FluxNetworkServer().also {
                             it.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_GENERAL)
                             it.readNetworkNBT(document.fullDocument!!.data, NBTType.NETWORK_PLAYERS)
-                        })
+                        }
+
+                        DustyDataSync.serverCoroutineScope.launch {
+                            FluxNetworkData.get().addNetwork(network)
+                        }
                     }
 
                     OperationType.UPDATE -> {
@@ -138,8 +142,10 @@ object FluxNetworksSyncer {
                     }
 
                     OperationType.DROP -> {
-                        for (network in FluxNetworkData.get().networks.values) {
-                            FluxNetworkData.get().removeNetwork(network)
+                        DustyDataSync.serverCoroutineScope.launch {
+                            for (network in FluxNetworkData.get().networks.values) {
+                                FluxNetworkData.get().removeNetwork(network)
+                            }
                         }
                     }
 
