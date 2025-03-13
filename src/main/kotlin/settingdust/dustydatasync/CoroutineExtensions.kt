@@ -1,58 +1,54 @@
 package settingdust.dustydatasync
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.channels.ticker
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlin.time.Duration
 
 
 /**
- * https://dev.to/psfeng/a-story-of-building-a-custom-flow-operator-buffertimeout-4d95
+ * https://github.com/Kotlin/kotlinx.coroutines/issues/1302#issuecomment-1416493795
  */
-@ExperimentalCoroutinesApi
-@ObsoleteCoroutinesApi
-fun <T> Flow<T>.bufferTimeout(size: Int, duration: Duration): Flow<Set<T>> {
-    require(size > 0) { "Window size should be greater than 0" }
-    require(duration.inWholeMilliseconds > 0) { "Duration should be greater than 0" }
+fun <T> Flow<T>.chunked(maxSize: Int, interval: Duration) = channelFlow {
 
-    return flow {
-        coroutineScope {
-            val events = LinkedHashSet<T>(size)
-            val tickerChannel = ticker(duration.inWholeMilliseconds)
-            try {
-                val upstreamValues = produce { collect { send(it) } }
+    val buffer = mutableListOf<T>()
+    var flushJob: Job? = null
 
-                while (isActive) {
-                    var hasTimedOut = false
+    collect { value ->
 
-                    select<Unit> {
-                        upstreamValues.onReceive {
-                            events.add(it)
-                        }
+        flushJob?.cancelAndJoin()
+        buffer.add(value)
 
-                        tickerChannel.onReceive {
-                            hasTimedOut = true
-                        }
-                    }
-
-                    if (events.size == size || (hasTimedOut && events.isNotEmpty())) {
-                        emit(events)
-                        events.clear()
-                    }
+        if (buffer.size >= maxSize) {
+            send(buffer.toList())
+            buffer.clear()
+        } else {
+            flushJob = launch {
+                delay(interval)
+                if (buffer.isNotEmpty()) {
+                    send(buffer.toList())
+                    buffer.clear()
                 }
-            } catch (_: ClosedReceiveChannelException) {
-                // drain remaining events
-                if (events.isNotEmpty()) emit(events)
-            } finally {
-                tickerChannel.cancel()
             }
         }
+    }
+
+    flushJob?.cancelAndJoin()
+
+    if (buffer.isNotEmpty()) {
+        send(buffer.toList())
+        buffer.clear()
     }
 }

@@ -86,7 +86,7 @@ object FluxNetworksSyncer {
     init {
         val collection = Database.database.getCollection<SyncedFluxNetwork>(SyncedFluxNetwork.COLLECTION)
         updates
-            .bufferTimeout(Int.MAX_VALUE, 100.milliseconds)
+            .chunked(Int.MAX_VALUE, 100.milliseconds)
             .onEach { networks ->
                 collection.bulkWrite(
                     networks.map { network ->
